@@ -13,7 +13,7 @@
 | Feature branch | `feature/user-regional-preferences` | `feature/user-regional-preferences` |
 | PR | [#61](https://github.com/magpern/universal-multilingual/pull/61) | [#33](https://github.com/magpern/universal-multicurrency/pull/33) |
 | Merge SHA | `9f566cd25` | `024992b50` |
-| Final main | `9f566cd25` | `024992b50` |
+| Final main | `121ef9eb8` (incl. this closure) | `40b733d` (closure cross-ref) |
 | Version (unchanged) | 1.11.1 | 1.2.1 |
 | Schema / TARGET / inventory | TARGET **8** | schema **8**, inventory **12** |
 

@@ -44,6 +44,8 @@
 				<element value="aiml"/>
 				<element value="AIML"/>
 				<element value="AIMultilingual"/>
+				<!-- Cross-plugin Regional Preferences composition (shared with UMC). -->
+				<element value="um"/>
 			</property>
 		</properties>
 		<!-- "aiml"/"AIML" is the project-approved prefix (docs/); accepted despite being under 4 chars. -->
@@ -86,6 +88,9 @@
 	</rule>
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound">
 		<exclude-pattern>*/tests/*</exclude-pattern>
+		<!-- Shared Regional Preferences composition hooks use class constants
+		     whose values are the cross-plugin `um_*` names (ADR-0026). -->
+		<exclude-pattern>*/src/User/*</exclude-pattern>
 	</rule>
 	<!-- Rank Math (and similar) use slash-separated foreign hooks
 	     (rank_math/sitemap/...). Tests must invoke those exact names. -->

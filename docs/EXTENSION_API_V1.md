@@ -175,6 +175,16 @@ Site Health / admin diagnostics UI: **Deferred**.
 - REST registration endpoints
 - Runtime admin field UI
 
+## Preferred language (authenticated)
+
+Public helpers in `src/Extension/functions.php` (ADR-0026):
+
+- `aiml_get_preferred_language( int $user_id ): ?string`
+- `aiml_get_preferred_language_state( int $user_id ): ?array`
+- `aiml_set_preferred_language( int $user_id, ?string $code ): true|\WP_Error`
+
+Storage: user meta `aiml_preferred_language` (language code). Does **not** change URL/host language resolution. See [USER_REGIONAL_PREFERENCES_IMPLEMENTATION_PLAN.md](plans/USER_REGIONAL_PREFERENCES_IMPLEMENTATION_PLAN.md).
+
 ## Anti-patterns
 
 - Importing `Store`, `RegisteredMetaRegistry`, `AdapterRegistry`, `SurfaceRegistry`, or OTL/TI internals

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 use AIMultilingual\Extension\ExtensionServices;
 use AIMultilingual\Extension\VisitorLanguageContext;
+use AIMultilingual\User\PreferenceServices;
 
 /**
  * Marks a source identity dirty for coalesced request-local sync.
@@ -36,4 +37,60 @@ function aiml_mark_source_dirty( string $source_type, int $source_id ): bool {
  */
 function aiml_visitor_language(): ?VisitorLanguageContext {
 	return ExtensionServices::visitor_language();
+}
+
+/**
+ * Returns the stored valid preferred language code for a user, or null.
+ *
+ * Does not influence URL/host language resolution. Unauthorized callers receive null.
+ *
+ * @since 1.12.0
+ *
+ * @param int $user_id User id.
+ */
+function aiml_get_preferred_language( int $user_id ): ?string {
+	$service = PreferenceServices::preferred_language();
+	if ( null === $service ) {
+		return null;
+	}
+
+	return $service->get( $user_id );
+}
+
+/**
+ * Returns the preferred-language effective state for a user, or null if unbound.
+ *
+ * @since 1.12.0
+ *
+ * @param int $user_id User id.
+ * @return array<string, mixed>|null
+ */
+function aiml_get_preferred_language_state( int $user_id ): ?array {
+	$service = PreferenceServices::preferred_language();
+	if ( null === $service ) {
+		return null;
+	}
+
+	return $service->get_state( $user_id );
+}
+
+/**
+ * Sets or clears a user's preferred language.
+ *
+ * @since 1.12.0
+ *
+ * @param int         $user_id User id.
+ * @param string|null $code    Language code, or null/empty to clear.
+ * @return true|WP_Error
+ */
+function aiml_set_preferred_language( int $user_id, ?string $code ) {
+	$service = PreferenceServices::preferred_language();
+	if ( null === $service ) {
+		return new WP_Error(
+			'aiml_unavailable',
+			__( 'Multilingual support is not currently available.', 'universal-multilingual' )
+		);
+	}
+
+	return $service->set( $user_id, $code );
 }

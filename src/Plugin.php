@@ -76,6 +76,10 @@ use AIMultilingual\Extension\ExtensionRegistry;
 use AIMultilingual\Extension\ExtensionServices;
 use AIMultilingual\Extension\VisitorTranslationResolver;
 use AIMultilingual\Frontend\Switcher;
+use AIMultilingual\User\PreferenceServices;
+use AIMultilingual\User\PreferredLanguage;
+use AIMultilingual\User\PreferredLanguageField;
+use AIMultilingual\User\RegionalPreferencesHost;
 use AIMultilingual\Seo\Diagnostics\SeoDiagnosticsService;
 use AIMultilingual\Seo\DocumentSeoHead;
 use AIMultilingual\Seo\LanguageRelationshipService;
@@ -445,6 +449,11 @@ final class Plugin {
 		( new Renderer( $context, $store, $extractor, $block_frontend ) )->register();
 		( new DocumentSeoHead( $relationships ) )->register();
 		( new Switcher( $settings, $languages, $context, $relationships ) )->register();
+
+		$preferred_language = new PreferredLanguage( $languages );
+		PreferenceServices::bind_preferred_language( $preferred_language );
+		( new PreferredLanguageField( $preferred_language ) )->register();
+		( new RegionalPreferencesHost() )->register();
 
 		$elementor_resolver = new ElementorOverlayResolver( $store, $elementor_diagnostics );
 		$elementor_applier  = new ElementorOverlayApplier( $elementor_registry, $elementor_diagnostics );

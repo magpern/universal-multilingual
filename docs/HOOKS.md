@@ -221,8 +221,25 @@ See [INTEGRATION_API_V1.md](INTEGRATION_API_V1.md).
 | `aiml_register_extensions` | default | Receives `ExtensionRegistrar`; root extension ownership + nested meta/block registration; registries seal after hook |
 | `aiml_mark_source_dirty( $source_type, $source_id )` | — | Request-local invalidation mark only; no immediate sync; M5-A also admits activated chrome CPT sources |
 | `aiml_visitor_language(): ?VisitorLanguageContext` | — | Public URL/host visitor language (`code`, `is_default`); null when unavailable/too early (1.7.0) |
+| `aiml_get_preferred_language( $user_id ): ?string` | — | Stored valid preferred language code (authz); does not affect URL resolution (ADR-0026) |
+| `aiml_get_preferred_language_state( $user_id ): ?array` | — | Effective preference state for UI/consumers |
+| `aiml_set_preferred_language( $user_id, $code )` | — | Set/clear preferred language (`true`\|`WP_Error`); capability-gated |
 | WP-CLI `aiml extensions list` | — | Read-only extension diagnostics |
 | WP-CLI `aiml extensions status <extension_id>` | — | Read-only extension status |
+
+## Regional Preferences composition — `src/User/`
+
+Cross-plugin string-stable hooks shared with Universal Multicurrency (no hard dependency). See [ADR-0026](adr/0026-authenticated-preferred-language.md) and [USER_REGIONAL_PREFERENCES_IMPLEMENTATION_PLAN.md](plans/USER_REGIONAL_PREFERENCES_IMPLEMENTATION_PLAN.md).
+
+| Hook | Purpose |
+|---|---|
+| `um_regional_preferences_rendered` | Once-flag when a host opens the section |
+| `um_regional_preferences_render` | Providers render their own fields |
+| `um_regional_preferences_save_started` | Once-flag before save dispatch |
+| `um_regional_preferences_save` | Providers process their own POST |
+| `um_regional_preferences_claimed_slots` | Filter; providers claim `language` / `currency` |
+
+UML hosts at priority 10; owns language field only. Unclaimed slots get host read-only fallbacks (`WPLANG` for language when UML absent from a peer host; store currency label when UMC absent).
 
 Rank Math visitor overlays remain on Integration API v1 output hooks and official Rank Math filter seams (`rank_math/frontend/*`, Open Graph, sitemap). Extension API v1 does not replace Rank Math `p:rankmath:*` identities.
 

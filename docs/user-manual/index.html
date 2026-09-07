@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ai-multilingual repository documentation">
-<title>Universal Multilingual User Manual — v1.11.0</title>
+<title>Universal Multilingual User Manual — v1.12.0</title>
 <style>
 :root {
   --bg: #f7f6f2;
@@ -287,6 +287,8 @@ footer.doc-foot {
     <a href="#introduction" data-toc>1. Introduction</a>
     <a href="#quick-start" data-toc>2. Quick start</a>
     <a href="#initial-configuration" data-toc>3. Initial configuration</a>
+    <a href="#regional-preferences" data-toc class="toc-h3">3a. Regional preferences</a>
+    <a href="#floating-selector" data-toc class="toc-h3">3b. Floating selector</a>
     <a href="#translator-workspace" data-toc>4. Translator Workspace</a>
     <a href="#translating-content" data-toc>5. Translating content</a>
     <a href="#jobs" data-toc>6. Jobs</a>
@@ -318,15 +320,15 @@ footer.doc-foot {
   <p class="meta" style="margin:0 0 .35rem"><strong>Universal Multilingual</strong> · User Manual</p>
   <h1>How to configure and operate Universal Multilingual</h1>
   <p class="meta">
-    <strong>Applies to version:</strong> 1.11.0<br>
+    <strong>Applies to version:</strong> 1.12.0<br>
     <strong>Schema TARGET:</strong> 8<br>
     <strong>Canonical path:</strong> <code>docs/user-manual/index.html</code><br>
-    <strong>Last updated:</strong> 2026-08-31<br>
-    <strong>Release:</strong> <a href="https://github.com/magpern/universal-multilingual/releases/tag/v1.11.0">v1.11.0</a><br>
+    <strong>Last updated:</strong> 2026-09-08<br>
+    <strong>Release:</strong> <a href="https://github.com/magpern/universal-multilingual/releases/tag/v1.12.0">v1.12.0</a><br>
     <strong>Historical acceptance:</strong> <a href="../acceptance/v1.6.0-vlad-acceptance.html">v1.6.0 Vlad checklist</a> (not current-version evidence)
   </p>
   <p>Practical guide for WordPress / WooCommerce administrators. Ordinary operation uses the admin UI — you do not need CLI or REST for day-to-day work.</p>
-  <p class="callout"><strong class="label">Maintenance</strong> This manual describes product capabilities for <strong>v1.11.0</strong> (TARGET&nbsp;8). Review and update it when operator-facing behavior, Settings, Workspace, Jobs, Localized URLs, or Supported/Deferred contracts change. It is not an acceptance-test checklist.</p>
+  <p class="callout"><strong class="label">Maintenance</strong> This manual describes product capabilities for <strong>v1.12.0</strong> (TARGET&nbsp;8). Review and update it when operator-facing behavior, Settings, Workspace, Jobs, Localized URLs, or Supported/Deferred contracts change. It is not an acceptance-test checklist.</p>
   <p>
     <span class="badge supported">Supported</span>
     <span class="badge optional">Optional</span>
@@ -338,6 +340,8 @@ footer.doc-foot {
   <ul class="task-grid">
     <li><a href="#quick-start">Start here (first setup)</a></li>
     <li><a href="#initial-configuration">Languages &amp; Settings</a></li>
+    <li><a href="#regional-preferences">Regional preferences</a></li>
+    <li><a href="#floating-selector">Floating language selector</a></li>
     <li><a href="#translating-content">Translate content</a></li>
     <li><a href="#review-publication">Review &amp; publish</a></li>
     <li><a href="#site-translate">Site Translate (multi-page workflow)</a></li>
@@ -432,6 +436,36 @@ footer.doc-foot {
   </div>
 
   <div class="callout"><strong class="label">Elementor flags</strong> Elementor extraction/rendering options exist internally and default <strong>Off</strong>, but <strong>v1.6.0 has no merchant Settings toggles</strong> for them. Treat Elementor enablement as an advanced/site-ops concern unless your deployment documents otherwise.</div>
+  <a class="back-top" href="#content">Back to top</a>
+</section>
+
+<section id="regional-preferences" data-section>
+  <h2>3a. Regional preferences</h2>
+  <p><span class="badge supported">Supported</span> Signed-in users can store a <strong>preferred language</strong>. That value is a preference, not the current page language. The URL (and Localized URL routing when On) remains the language visitors actually see.</p>
+  <ul>
+    <li><strong>WordPress profile:</strong> Users → Profile → <strong>Regional Preferences</strong> → Language.</li>
+    <li><strong>WooCommerce:</strong> My Account → Account details shows the same language field when WooCommerce is active.</li>
+    <li><strong>Default:</strong> when a user has not chosen a language, the site uses WordPress <code>WPLANG</code> (empty site locale is treated as <code>en_US</code>).</li>
+    <li><strong>Saving:</strong> choosing a published/preview language stores that code. Clearing the field restores the site default.</li>
+  </ul>
+  <div class="callout"><strong class="label">Preferred vs current</strong> Preferred language does <strong>not</strong> rewrite the current URL or anonymous cache. Visitors still see the language of the URL they opened. Universal Multicurrency may show a matching currency field in the same Regional Preferences section when that plugin is active — it is optional composition, not a required dependency.</div>
+  <a class="back-top" href="#content">Back to top</a>
+</section>
+
+<section id="floating-selector" data-section>
+  <h2>3b. Floating language selector</h2>
+  <p><span class="badge optional">Optional</span> An edge-docked language control on the public site. <strong>Default Off.</strong> Leave it Off unless you want a visitor-facing switcher in addition to any theme/menu switcher.</p>
+  <ul>
+    <li><strong>Enable:</strong> Settings → Enable floating selector. Until then the control is absent from the front end.</li>
+    <li><strong>Side / vertical:</strong> left or right edge; top, center, or bottom.</li>
+    <li><strong>Collapsed look:</strong> language code, language name, or globe icon. No country flags.</li>
+    <li><strong>Preset:</strong> Edge pill, Minimal, or Tab.</li>
+    <li><strong>Desktop / mobile:</strong> two checkboxes hide the same markup with CSS. There is no separate mobile HTML or device sniffing.</li>
+    <li><strong>Without JavaScript:</strong> each language is a normal link. Users can still change language.</li>
+    <li><strong>Keyboard:</strong> the collapsed control is a disclosure, not a listbox. Focus and Escape behave as a disclosure.</li>
+    <li><strong>Signed-in persist:</strong> when “Remember language for signed-in users” is On (default), a click best-effort saves preferred language. Navigation never waits on that save. Guests get no language cookie.</li>
+  </ul>
+  <p>The selector uses the same switcher URLs as the rest of the plugin. It does not change routing, cache keys, or anonymous language authority.</p>
   <a class="back-top" href="#content">Back to top</a>
 </section>
 
@@ -656,6 +690,7 @@ footer.doc-foot {
   <p><span class="badge optional">Optional</span> WooCommerce is not required to run the plugin, but when present AIML covers Supported visitor/catalog/checkout chrome, email subjects/headings (bounded), attribute labels, and Localized URLs for products / admitted product taxonomies.</p>
   <ul>
     <li>Prices, stock, and commerce identity remain WooCommerce’s — translations overlay labels/copy, not invent pricing.</li>
+    <li>My Account → Account details includes the Regional Preferences language field when the plugin is active. See <a href="#regional-preferences">Regional preferences</a>.</li>
     <li><span class="badge deferred">Deferred</span> Translated rewrite bases, endpoint names, pretty layered-nav.</li>
     <li><span class="badge unsupported">Unsupported</span> Distinct variation Localized URLs.</li>
   </ul>
@@ -804,8 +839,10 @@ footer.doc-foot {
 </section>
 
 <section id="limitations" data-section>
-  <h2>20. Current limitations (v1.11.0)</h2>
+  <h2>20. Current limitations (v1.12.0)</h2>
   <ul>
+    <li>Floating language selector is opt-in (default Off); it does not replace theme/menu switchers.</li>
+    <li>Preferred language is a signed-in preference only — it does not change the current URL language or set an anonymous cookie.</li>
     <li>Site Translate covers pages/posts/products only (not menus/terms one-click).</li>
     <li>Jobs → Operations linking is source-level only (no translation_id enrichment).</li>
     <li>Richer multi-language UX polish remains backlog.</li>
@@ -825,6 +862,7 @@ footer.doc-foot {
   <ul>
     <li><strong>Extension API v1</strong> — <a href="../EXTENSION_API_V1.md"><code>docs/EXTENSION_API_V1.md</code></a> (hook <code>aiml_register_extensions</code>).</li>
     <li><strong>Integration API v1</strong> — <a href="../INTEGRATION_API_V1.md"><code>docs/INTEGRATION_API_V1.md</code></a> (hook <code>aiml_register_integrations</code>).</li>
+    <li><strong>Preferred language</strong> — <code>aiml_get_preferred_language</code>, <code>aiml_get_preferred_language_state</code>, <code>aiml_set_preferred_language</code> for signed-in users. Not a routing API.</li>
     <li>Hooks index — <a href="../HOOKS.md"><code>docs/HOOKS.md</code></a>.</li>
     <li>CLI diagnostics for Localized URLs / Jobs / SEO — see <a href="../ops/BACKGROUND_TRANSLATION_JOBS_RUNBOOK.md">Jobs ops runbook</a> and <a href="../runbooks/LOCALIZED_URL_OPERATOR.md">Localized URL operator runbook</a> (advanced; not required for ordinary Workspace workflows).</li>
   </ul>
@@ -838,6 +876,9 @@ footer.doc-foot {
   <table>
     <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
     <tbody>
+      <tr><td>Preferred language</td><td>Signed-in user’s stored language preference; not the current URL language</td></tr>
+      <tr><td>Current (URL) language</td><td>Language of the request path / Localized URL the visitor opened</td></tr>
+      <tr><td>Floating language selector</td><td>Optional edge control (default Off) that uses existing switcher URLs</td></tr>
       <tr><td>Source language</td><td>Default language; canonical content</td></tr>
       <tr><td>Target language</td><td>Additional language receiving overlays</td></tr>
       <tr><td>Translation segment</td><td>Unit of translated text (title, block, widget field, …)</td></tr>

@@ -7,9 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-08
+
 ### Added
 
-- Optional floating language selector (default off): edge presentation of existing Switcher/SB11 URLs, progressive enhancement, authenticated best-effort preferred-language persist. Settings schema marker `1 → 2`. No DB migration. No release.
+#### Regional preferences
+
+- Logged-in preferred language stored as `aiml_preferred_language` (language code).
+- WordPress Profile and WooCommerce My Account → Account details fields.
+- Public API: `aiml_get_preferred_language`, `aiml_get_preferred_language_state`, `aiml_set_preferred_language`.
+- Optional composition with Universal Multicurrency via `um_regional_preferences_*` hooks (no hard UMC dependency).
+- Site-default fallback uses WordPress `WPLANG` (empty → `en_US`). Preferred language does not change URL render language.
+
+#### Floating language selector
+
+- Optional visitor-facing edge selector, **default off**.
+- Left/right edge, top/center/bottom, code/name/globe collapsed modes, edge_pill/minimal/tab presets.
+- Desktop/mobile visibility via CSS (same HTML; no device sniffing).
+- Progressive enhancement: language links remain usable without JavaScript.
+- Keyboard disclosure (not a listbox); no flags.
+- Authenticated best-effort preference persist (`keepalive` fetch) that never blocks navigation.
+- Documented edge-control convention for future independent UMC currency UI.
+
+### Compatibility / infrastructure
+
+- URL/host remains the only anonymous language authority. No language cookie. Anonymous cache contract unchanged.
+- `Migrator::TARGET` remains **8** (no DB migration).
+- `Settings::SCHEMA_VERSION` **1 → 2** (option-shape marker only).
+- No hard Universal Multicurrency dependency.
+
+### Documentation
+
+- User manual: Regional Preferences and floating selector.
+- Release notes: `docs/releases/v1.12.0.md`.
 
 ## [1.11.1] - 2026-09-02
 

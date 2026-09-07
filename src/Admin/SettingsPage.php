@@ -433,6 +433,8 @@ final class SettingsPage {
 
 		echo '</tbody></table>';
 
+		$this->render_floating_selector_settings( $current );
+
 		$this->render_strategy_f_settings( $current );
 
 		if ( null !== $this->localized_urls ) {
@@ -734,6 +736,138 @@ final class SettingsPage {
 			checked( $checked, true, false ),
 			esc_html( $description )
 		);
+	}
+
+	/**
+	 * Checkbox that can persist an explicit false (hidden 0 + checkbox 1).
+	 *
+	 * @param string $key         Settings key.
+	 * @param string $label       Field label.
+	 * @param string $description Help text.
+	 * @param bool   $checked     Current value.
+	 */
+	private function checkbox_row_explicit( string $key, string $label, string $description, bool $checked ): void {
+		printf(
+			'<tr><th scope="row">%1$s</th><td>'
+			. '<input type="hidden" name="%2$s[%3$s]" value="0" />'
+			. '<label><input type="checkbox" name="%2$s[%3$s]" value="1"%4$s /> %5$s</label>'
+			. '</td></tr>',
+			esc_html( $label ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( $key ),
+			checked( $checked, true, false ),
+			esc_html( $description )
+		);
+	}
+
+	/**
+	 * Allowlisted select row.
+	 *
+	 * @param string                $key         Settings key.
+	 * @param string                $label       Field label.
+	 * @param string                $description Help text.
+	 * @param string                $current     Current value.
+	 * @param array<string, string> $choices     Value => label.
+	 */
+	private function select_row( string $key, string $label, string $description, string $current, array $choices ): void {
+		echo '<tr><th scope="row"><label for="aiml_' . esc_attr( $key ) . '">' . esc_html( $label ) . '</label></th><td>';
+		echo '<select name="' . esc_attr( Settings::OPTION . '[' . $key . ']' ) . '" id="aiml_' . esc_attr( $key ) . '">';
+		foreach ( $choices as $value => $choice_label ) {
+			echo '<option value="' . esc_attr( $value ) . '"' . selected( $current, $value, false ) . '>' . esc_html( $choice_label ) . '</option>';
+		}
+		echo '</select>';
+		echo '<p class="description">' . esc_html( $description ) . '</p>';
+		echo '</td></tr>';
+	}
+
+	/**
+	 * Floating language selector settings (default off; presentation only).
+	 *
+	 * @param array<string, mixed> $current Current settings.
+	 */
+	private function render_floating_selector_settings( array $current ): void {
+		echo '<h2>' . esc_html__( 'Floating language selector', 'universal-multilingual' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Optional visitor control on the page edge. It uses the same language URLs as the existing switcher and stays off until you enable it. No flags. Hide current language does not apply here — the current page language stays visible.', 'universal-multilingual' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Layout: a compact control on the chosen edge (right by default), vertically centered, expanding inward as a short list of language links.', 'universal-multilingual' ) . '</p>';
+
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		$this->checkbox_row_explicit(
+			'floating_selector_enabled',
+			__( 'Enable floating selector', 'universal-multilingual' ),
+			__( 'Show the edge language selector on the public site. Default off.', 'universal-multilingual' ),
+			(bool) ( $current['floating_selector_enabled'] ?? false )
+		);
+
+		$this->select_row(
+			'floating_selector_side',
+			__( 'Edge', 'universal-multilingual' ),
+			__( 'Physical left or right edge of the viewport.', 'universal-multilingual' ),
+			(string) ( $current['floating_selector_side'] ?? 'right' ),
+			array(
+				'right' => __( 'Right', 'universal-multilingual' ),
+				'left'  => __( 'Left', 'universal-multilingual' ),
+			)
+		);
+
+		$this->select_row(
+			'floating_selector_vertical',
+			__( 'Vertical position', 'universal-multilingual' ),
+			__( 'Top, center, or bottom of the chosen edge.', 'universal-multilingual' ),
+			(string) ( $current['floating_selector_vertical'] ?? 'center' ),
+			array(
+				'top'    => __( 'Top', 'universal-multilingual' ),
+				'center' => __( 'Center', 'universal-multilingual' ),
+				'bottom' => __( 'Bottom', 'universal-multilingual' ),
+			)
+		);
+
+		$this->select_row(
+			'floating_selector_collapsed',
+			__( 'Collapsed appearance', 'universal-multilingual' ),
+			__( 'What the closed control shows: language code, name, or a globe icon with accessible text.', 'universal-multilingual' ),
+			(string) ( $current['floating_selector_collapsed'] ?? 'code' ),
+			array(
+				'code'  => __( 'Language code', 'universal-multilingual' ),
+				'name'  => __( 'Language name', 'universal-multilingual' ),
+				'globe' => __( 'Globe icon', 'universal-multilingual' ),
+			)
+		);
+
+		$this->select_row(
+			'floating_selector_preset',
+			__( 'Preset', 'universal-multilingual' ),
+			__( 'Visual style of the edge control.', 'universal-multilingual' ),
+			(string) ( $current['floating_selector_preset'] ?? 'edge_pill' ),
+			array(
+				'edge_pill' => __( 'Edge pill', 'universal-multilingual' ),
+				'minimal'   => __( 'Minimal', 'universal-multilingual' ),
+				'tab'       => __( 'Tab', 'universal-multilingual' ),
+			)
+		);
+
+		$this->checkbox_row_explicit(
+			'floating_selector_show_desktop',
+			__( 'Show on desktop', 'universal-multilingual' ),
+			__( 'Visible at viewport widths of 782px and up. Markup stays the same; CSS hides it when off.', 'universal-multilingual' ),
+			(bool) ( $current['floating_selector_show_desktop'] ?? true )
+		);
+
+		$this->checkbox_row_explicit(
+			'floating_selector_show_mobile',
+			__( 'Show on mobile', 'universal-multilingual' ),
+			__( 'Visible below 782px. Markup stays the same; CSS hides it when off.', 'universal-multilingual' ),
+			(bool) ( $current['floating_selector_show_mobile'] ?? true )
+		);
+
+		$this->checkbox_row_explicit(
+			'floating_selector_persist_preference',
+			__( 'Remember language for signed-in users', 'universal-multilingual' ),
+			__( 'Best-effort: selecting a language may save the existing preferred-language setting while the browser navigates. Navigation never waits on this save.', 'universal-multilingual' ),
+			(bool) ( $current['floating_selector_persist_preference'] ?? true )
+		);
+
+		echo '</tbody></table>';
 	}
 
 	/**

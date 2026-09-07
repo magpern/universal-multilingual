@@ -415,7 +415,10 @@ footer.doc-foot {
     <thead><tr><th>Setting</th><th>Default</th><th>What it does</th><th>When / risks</th></tr></thead>
     <tbody>
       <tr><td>Native language names</td><td>On</td><td>Switcher shows native names</td><td>Safe to change later</td></tr>
-      <tr><td>Hide current language</td><td>Off</td><td>Hides current language in switcher</td><td>Cosmetic</td></tr>
+      <tr><td>Hide current language</td><td>Off</td><td>Hides current language in switcher</td><td>Cosmetic; does <strong>not</strong> hide it in the floating selector</td></tr>
+      <tr><td>Enable floating selector</td><td>Off</td><td>Shows an optional edge language control on the public site</td><td>Safe; uses the same URLs as the switcher; leave Off until you want it</td></tr>
+      <tr><td>Floating selector edge / position / preset</td><td>Right / Center / Edge pill</td><td>Where and how the control looks</td><td>Cosmetic; no flags; CSS hides mobile or desktop when those boxes are off</td></tr>
+      <tr><td>Remember language for signed-in users</td><td>On</td><td>Best-effort save of preferred language on click</td><td>Does not change the current page language; navigation never waits on the save</td></tr>
       <tr><td>Delete all data on uninstall</td><td>Off</td><td>Wipes plugin data when uninstalled</td><td><strong>Destructive</strong> — leave Off unless intentional</td></tr>
       <tr><td>Block saves on QA errors</td><td>On</td><td>Blocks save when QA errors present</td><td>Loosen only if you accept lower structural safety</td></tr>
       <tr><td>Enable AI provider</td><td>Off</td><td>Allows machine translation Jobs/actions</td><td>Requires provider + key</td></tr>

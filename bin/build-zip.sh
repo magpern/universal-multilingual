@@ -37,6 +37,7 @@ mkdir -p "$BUILD/assets"
 [ -f "$ROOT/assets/block-editor.js" ] && cp "$ROOT/assets/block-editor.js" "$BUILD/assets/"
 [ -d "$ROOT/assets/glossary-admin" ] && cp -R "$ROOT/assets/glossary-admin" "$BUILD/assets/glossary-admin"
 [ -d "$ROOT/assets/term-slug-admin" ] && cp -R "$ROOT/assets/term-slug-admin" "$BUILD/assets/term-slug-admin"
+[ -d "$ROOT/assets/frontend" ] && cp -R "$ROOT/assets/frontend" "$BUILD/assets/frontend"
 if [ -d "$ROOT/assets/translator-workspace/build" ]; then
     mkdir -p "$BUILD/assets/translator-workspace"
     cp -R "$ROOT/assets/translator-workspace/build" "$BUILD/assets/translator-workspace/build"

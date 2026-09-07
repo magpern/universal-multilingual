@@ -169,4 +169,24 @@ final class SwitcherTest extends AimlTestCase {
 
 		remove_filter( 'aiml_switcher_in_menu', '__return_true' );
 	}
+
+	public function test_all_language_links_keep_current_when_hide_current_is_on(): void {
+		$this->add_language();
+		$this->route( '/sv/' );
+
+		$settings = array( 'switcher_hide_current' => true );
+		$switcher = $this->switcher( $settings );
+
+		$hidden = array_column( $switcher->links(), 'code' );
+		$all    = array_column( $switcher->all_language_links(), 'code' );
+
+		$this->assertNotContains( 'sv', $hidden );
+		$this->assertContains( 'en', $hidden );
+		$this->assertContains( 'sv', $all );
+		$this->assertContains( 'en', $all );
+
+		$by_code_links = array_column( $switcher->links(), 'url', 'code' );
+		$by_code_all   = array_column( $switcher->all_language_links(), 'url', 'code' );
+		$this->assertSame( $by_code_links['en'], $by_code_all['en'] );
+	}
 }

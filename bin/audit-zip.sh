@@ -45,6 +45,8 @@ required = {
     "universal-multilingual/assets/term-slug-admin/term-slug-admin.js",
     "universal-multilingual/assets/translator-workspace/build/index.js",
     "universal-multilingual/assets/translator-workspace/build/index.asset.php",
+    "universal-multilingual/assets/frontend/floating-selector.css",
+    "universal-multilingual/assets/frontend/floating-selector.js",
     "universal-multilingual/src/Plugin.php",
 }
 

@@ -65,6 +65,10 @@ final class RegionalPreferencesHost {
 			return;
 		}
 
+		if ( did_action( RegionalPreferencesComposition::ACTION_RENDERED ) > 0 ) {
+			return;
+		}
+
 		echo '<fieldset class="aiml-regional-preferences">';
 		$this->render_section(
 			RegionalPreferencesComposition::SURFACE_ACCOUNT,

@@ -34,7 +34,7 @@ final class Settings {
 	/**
 	 * Shape version of the settings array (not the database schema version).
 	 */
-	public const SCHEMA_VERSION = 1;
+	public const SCHEMA_VERSION = 2;
 
 	/**
 	 * Lazily loaded, sanitized settings.
@@ -78,6 +78,19 @@ final class Settings {
 			// Language switcher presentation.
 			'switcher_show_native_name'                => true,
 			'switcher_hide_current'                    => false,
+
+			/*
+			 * Optional visitor-facing floating language selector (STATE A).
+			 * Default off: presentation-only consumer of existing Switcher URLs.
+			 */
+			'floating_selector_enabled'                => false,
+			'floating_selector_side'                   => 'right',
+			'floating_selector_vertical'               => 'center',
+			'floating_selector_collapsed'              => 'code',
+			'floating_selector_preset'                 => 'edge_pill',
+			'floating_selector_show_desktop'           => true,
+			'floating_selector_show_mobile'            => true,
+			'floating_selector_persist_preference'     => true,
 
 			/*
 			 * Strategy F (F1): block attribute registration.
@@ -185,7 +198,7 @@ final class Settings {
 
 		$clean = $defaults;
 
-		foreach ( array( 'remove_data_on_uninstall', 'switcher_show_native_name', 'switcher_hide_current', 'block_attr_registration_enabled', 'block_uuid_injection_enabled', 'block_extraction_enabled', 'block_frontend_rendering_enabled', 'elementor_extraction_enabled', 'elementor_frontend_rendering_enabled', 'ai_enabled', 'qa_block_on_error', 'segment_publication_gate_enabled' ) as $key ) {
+		foreach ( array( 'remove_data_on_uninstall', 'switcher_show_native_name', 'switcher_hide_current', 'floating_selector_enabled', 'floating_selector_show_desktop', 'floating_selector_show_mobile', 'floating_selector_persist_preference', 'block_attr_registration_enabled', 'block_uuid_injection_enabled', 'block_extraction_enabled', 'block_frontend_rendering_enabled', 'elementor_extraction_enabled', 'elementor_frontend_rendering_enabled', 'ai_enabled', 'qa_block_on_error', 'segment_publication_gate_enabled' ) as $key ) {
 			if ( array_key_exists( $key, $raw ) ) {
 				$clean[ $key ] = self::to_bool( $raw[ $key ] );
 			}
@@ -201,6 +214,20 @@ final class Settings {
 			$provider             = preg_replace( '/[^a-z0-9_\-]/', '', $provider ) ?? '';
 			$allowed              = array( '', 'openai', 'deepseek' );
 			$clean['ai_provider'] = in_array( $provider, $allowed, true ) ? $provider : '';
+		}
+
+		$enum_keys = array(
+			'floating_selector_side'      => array( 'left', 'right' ),
+			'floating_selector_vertical'  => array( 'top', 'center', 'bottom' ),
+			'floating_selector_collapsed' => array( 'code', 'name', 'globe' ),
+			'floating_selector_preset'    => array( 'edge_pill', 'minimal', 'tab' ),
+		);
+		foreach ( $enum_keys as $key => $allowed ) {
+			if ( ! array_key_exists( $key, $raw ) ) {
+				continue;
+			}
+			$value         = strtolower( trim( (string) $raw[ $key ] ) );
+			$clean[ $key ] = in_array( $value, $allowed, true ) ? $value : $defaults[ $key ];
 		}
 
 		if ( array_key_exists( 'auto_publication_mode', $raw ) ) {
@@ -536,6 +563,62 @@ final class Settings {
 	 */
 	public function switcher_hide_current(): bool {
 		return (bool) $this->get()['switcher_hide_current'];
+	}
+
+	/**
+	 * Whether the optional floating language selector is enabled.
+	 */
+	public function floating_selector_enabled(): bool {
+		return (bool) $this->get()['floating_selector_enabled'];
+	}
+
+	/**
+	 * Physical edge for the floating selector (`left` or `right`).
+	 */
+	public function floating_selector_side(): string {
+		return (string) $this->get()['floating_selector_side'];
+	}
+
+	/**
+	 * Vertical docking (`top`, `center`, or `bottom`).
+	 */
+	public function floating_selector_vertical(): string {
+		return (string) $this->get()['floating_selector_vertical'];
+	}
+
+	/**
+	 * Collapsed representation (`code`, `name`, or `globe`).
+	 */
+	public function floating_selector_collapsed(): string {
+		return (string) $this->get()['floating_selector_collapsed'];
+	}
+
+	/**
+	 * Visual preset (`edge_pill`, `minimal`, or `tab`).
+	 */
+	public function floating_selector_preset(): string {
+		return (string) $this->get()['floating_selector_preset'];
+	}
+
+	/**
+	 * Whether the selector is shown at the desktop media query.
+	 */
+	public function floating_selector_show_desktop(): bool {
+		return (bool) $this->get()['floating_selector_show_desktop'];
+	}
+
+	/**
+	 * Whether the selector is shown at the mobile media query.
+	 */
+	public function floating_selector_show_mobile(): bool {
+		return (bool) $this->get()['floating_selector_show_mobile'];
+	}
+
+	/**
+	 * Whether authenticated clicks may best-effort persist preferred language.
+	 */
+	public function floating_selector_persist_preference(): bool {
+		return (bool) $this->get()['floating_selector_persist_preference'];
 	}
 
 	/**

@@ -75,6 +75,7 @@ use AIMultilingual\Extension\ExtensionRegistrar;
 use AIMultilingual\Extension\ExtensionRegistry;
 use AIMultilingual\Extension\ExtensionServices;
 use AIMultilingual\Extension\VisitorTranslationResolver;
+use AIMultilingual\Frontend\FloatingSelector;
 use AIMultilingual\Frontend\Switcher;
 use AIMultilingual\User\PreferenceServices;
 use AIMultilingual\User\PreferredLanguage;
@@ -448,7 +449,9 @@ final class Plugin {
 		$router->register();
 		( new Renderer( $context, $store, $extractor, $block_frontend ) )->register();
 		( new DocumentSeoHead( $relationships ) )->register();
-		( new Switcher( $settings, $languages, $context, $relationships ) )->register();
+		$switcher = new Switcher( $settings, $languages, $context, $relationships );
+		$switcher->register();
+		( new FloatingSelector( $settings, $languages, $context, $switcher ) )->register();
 
 		$preferred_language = new PreferredLanguage( $languages );
 		PreferenceServices::bind_preferred_language( $preferred_language );

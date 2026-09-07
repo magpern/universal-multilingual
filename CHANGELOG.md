@@ -5,13 +5,17 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Optional floating language selector (default off): edge presentation of existing Switcher/SB11 URLs, progressive enhancement, authenticated best-effort preferred-language persist. Settings schema marker `1 → 2`. No DB migration. No release.
+
 ## [1.11.1] - 2026-09-02
 
 ### Added
 
 - Self-updates from a private update server via the bundled Plugin Update Checker v5 Composer dependency; active only when `PRIVATE_UPDATE_SERVER` is defined in `wp-config.php`.
-
-## [Unreleased]
 
 ## [1.11.0] — 2026-08-31
 

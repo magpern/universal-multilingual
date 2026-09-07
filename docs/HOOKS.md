@@ -54,6 +54,20 @@ in the admin. A re-entrancy flag prevents a filter from re-entering itself.
 
 URLs come from `LanguageRelationshipService` (SB11).
 
+## Front end — `src/Frontend/FloatingSelector.php`
+
+Optional edge language selector (default off). Presentation consumer of
+`Switcher::all_language_links()`; it does not build localized URLs.
+
+| Hook | Priority | Purpose |
+|---|---|---|
+| `wp_enqueue_scripts` | 20 | Prepare the request-local model once; enqueue CSS/JS only when eligible. |
+| `wp_footer` | 20 | Print already-prepared markup. Does not rebuild relationships. |
+| `wp_ajax_aiml_floating_selector_prefer` | 10 | Authenticated nonce-checked preferred-language persist via `aiml_set_preferred_language()`. **No** `wp_ajax_nopriv_*`. |
+
+Navigation is ordinary `<a href>` to Switcher/SB11 URLs. Persistence is
+best-effort (`fetch` + `keepalive`) and never authoritative.
+
 ## SEO head — `src/Seo/DocumentSeoHead.php`
 
 | Hook | Priority | Purpose |

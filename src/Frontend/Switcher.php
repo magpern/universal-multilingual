@@ -158,16 +158,40 @@ final class Switcher {
 	}
 
 	/**
-	 * Builds one link per available language.
+	 * Builds switcher links, applying `switcher_hide_current` when enabled.
 	 *
 	 * @param bool|null $native Force native names on or off; null uses the setting.
 	 * @return array<int, array{code: string, label: string, url: string, hreflang: string, current: bool}>
 	 */
 	public function links( ?bool $native = null ): array {
-		$use_native   = null === $native ? $this->settings->switcher_show_native_name() : $native;
-		$hide_current = $this->settings->switcher_hide_current();
-		$can_preview  = current_user_can( Plugin::CAPABILITY );
-		$path         = $this->relationships->current_unprefixed_path();
+		return $this->collect_links( $native, $this->settings->switcher_hide_current() );
+	}
+
+	/**
+	 * Authoritative language-link model for every presentation surface.
+	 *
+	 * Same Switcher / SB11 / SA7 URLs as {@see self::links()}, without applying
+	 * `switcher_hide_current`. The floating selector must keep the current
+	 * language visible.
+	 *
+	 * @param bool|null $native Force native names on or off; null uses the setting.
+	 * @return array<int, array{code: string, label: string, url: string, hreflang: string, current: bool}>
+	 */
+	public function all_language_links( ?bool $native = null ): array {
+		return $this->collect_links( $native, false );
+	}
+
+	/**
+	 * Collects relationship-backed language links.
+	 *
+	 * @param bool|null $native       Force native names on or off; null uses the setting.
+	 * @param bool      $hide_current Whether to omit the current language.
+	 * @return array<int, array{code: string, label: string, url: string, hreflang: string, current: bool}>
+	 */
+	private function collect_links( ?bool $native, bool $hide_current ): array {
+		$use_native  = null === $native ? $this->settings->switcher_show_native_name() : $native;
+		$can_preview = current_user_can( Plugin::CAPABILITY );
+		$path        = $this->relationships->current_unprefixed_path();
 
 		$by_code = array();
 		foreach ( $this->relationships->for_path( $path, $can_preview ) as $rel ) {

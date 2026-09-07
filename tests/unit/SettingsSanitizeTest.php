@@ -27,6 +27,15 @@ final class SettingsSanitizeTest extends TestCase {
 		);
 		$this->assertTrue( $defaults['switcher_show_native_name'] );
 		$this->assertFalse( $defaults['switcher_hide_current'] );
+		$this->assertFalse( $defaults['floating_selector_enabled'] );
+		$this->assertSame( 'right', $defaults['floating_selector_side'] );
+		$this->assertSame( 'center', $defaults['floating_selector_vertical'] );
+		$this->assertSame( 'code', $defaults['floating_selector_collapsed'] );
+		$this->assertSame( 'edge_pill', $defaults['floating_selector_preset'] );
+		$this->assertTrue( $defaults['floating_selector_show_desktop'] );
+		$this->assertTrue( $defaults['floating_selector_show_mobile'] );
+		$this->assertTrue( $defaults['floating_selector_persist_preference'] );
+		$this->assertSame( 2, Settings::SCHEMA_VERSION );
 		$this->assertFalse( $defaults['block_attr_registration_enabled'] );
 		$this->assertFalse( $defaults['block_uuid_injection_enabled'] );
 		$this->assertFalse( $defaults['block_extraction_enabled'] );
@@ -163,6 +172,46 @@ final class SettingsSanitizeTest extends TestCase {
 
 		$invalid = Settings::sanitize( array( 'localized_urls_state' => 'bogus' ) );
 		$this->assertSame( 'off', $invalid['localized_urls_state'] );
+	}
+
+	public function test_floating_selector_enums_fall_back_to_defaults(): void {
+		$clean = Settings::sanitize(
+			array(
+				'floating_selector_side'      => 'top',
+				'floating_selector_vertical'  => 'left',
+				'floating_selector_collapsed' => 'flag',
+				'floating_selector_preset'    => 'custom',
+			)
+		);
+
+		$this->assertSame( 'right', $clean['floating_selector_side'] );
+		$this->assertSame( 'center', $clean['floating_selector_vertical'] );
+		$this->assertSame( 'code', $clean['floating_selector_collapsed'] );
+		$this->assertSame( 'edge_pill', $clean['floating_selector_preset'] );
+	}
+
+	public function test_floating_selector_valid_enums_and_booleans_persist(): void {
+		$clean = Settings::sanitize(
+			array(
+				'floating_selector_enabled'            => '1',
+				'floating_selector_side'               => 'LEFT',
+				'floating_selector_vertical'           => 'bottom',
+				'floating_selector_collapsed'          => 'globe',
+				'floating_selector_preset'             => 'minimal',
+				'floating_selector_show_desktop'       => '0',
+				'floating_selector_show_mobile'        => '1',
+				'floating_selector_persist_preference' => 'off',
+			)
+		);
+
+		$this->assertTrue( $clean['floating_selector_enabled'] );
+		$this->assertSame( 'left', $clean['floating_selector_side'] );
+		$this->assertSame( 'bottom', $clean['floating_selector_vertical'] );
+		$this->assertSame( 'globe', $clean['floating_selector_collapsed'] );
+		$this->assertSame( 'minimal', $clean['floating_selector_preset'] );
+		$this->assertFalse( $clean['floating_selector_show_desktop'] );
+		$this->assertTrue( $clean['floating_selector_show_mobile'] );
+		$this->assertFalse( $clean['floating_selector_persist_preference'] );
 	}
 
 	public function test_is_localized_url_generation_enabled_only_when_on(): void {

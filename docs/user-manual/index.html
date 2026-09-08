@@ -406,10 +406,20 @@ footer.doc-foot {
   <p>Path: <span class="menu-path">Multilingual → Languages</span>.</p>
   <ul>
     <li><strong>Default language</strong> = source content. Always published and unprefixed. Cannot be treated like a normal target.</li>
-    <li><strong>Target languages</strong> = additional rows with URL code, locale, name, native name, text direction, state, sort order.</li>
     <li><strong>State:</strong> <em>Preview</em> (translators only), <em>Published</em> (everyone), <em>Disabled</em> (not routed; returns through Preview before Published again).</li>
   </ul>
-  <p>Languages are stored separately from the Settings option. Changing languages later is supported; disable carefully if URLs/SEO already rely on a language.</p>
+  <h4>Adding a language</h4>
+  <ol>
+    <li>In the <strong>Add a language</strong> card, choose a language from the searchable list (type an English or native name).</li>
+    <li>If the language has more than one region, pick the <strong>Regional variant</strong> (for example <em>Portuguese (Portugal)</em> or <em>Portuguese (Brazil)</em>). Single-region languages skip this step.</li>
+    <li>Check the read-only summary — <strong>URL prefix</strong>, <strong>Locale</strong>, <strong>Native name</strong>, <strong>Direction</strong> are derived for you and cannot be mistyped.</li>
+    <li>Set <strong>Status</strong> and <strong>Sort order</strong> (pre-filled to the next value), then <strong>Add language</strong>.</li>
+  </ol>
+  <p>The URL code and locale are fixed once a language exists — changing either would break every translated URL. To change them, delete the language and add it again. On <strong>Edit</strong> you can change status, sort order and the switcher display name; a custom language also lets you edit its name and text direction.</p>
+  <h4>Advanced: custom language</h4>
+  <p>The collapsed <strong>Advanced: add a custom language</strong> section is for locales outside the standard list — you provide every value by hand. It can be turned off site-wide with the <code>aiml_allow_custom_language</code> filter.</p>
+  <p>The standard language list is bundled with the plugin (derived offline from WordPress/GlotPress locale data). It needs no internet connection and no installed language packs.</p>
+  <p>Languages are stored separately from the Settings option. Two languages can never share a locale. Changing languages later is supported; disable carefully if URLs/SEO already rely on a language.</p>
 
   <h3>Settings overview</h3>
   <p>Path: <span class="menu-path">Multilingual → Settings</span> (page title <strong>AI Multilingual Settings</strong>). Single option group <code>aiml_settings</code>.</p>

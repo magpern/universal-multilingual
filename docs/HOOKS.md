@@ -81,7 +81,10 @@ best-effort (`fetch` + `keepalive`) and never authoritative.
 | Hook | Capability |
 |---|---|
 | `admin_menu`, `admin_init` | — |
-| `admin_post_aiml_save_language` | `manage_options` + nonce |
+| `admin_enqueue_scripts` | Languages screen assets, gated to `toplevel_page_ai-multilingual` / `multilingual_page_ai-multilingual` |
+| `admin_body_class` | adds `aiml-languages-page` on the Languages screen only |
+| `admin_notices` (`Migrator::render_blocked_notice`) | `manage_options`; shown only while migration step 9 is blocked by duplicate locales |
+| `admin_post_aiml_save_language` | `manage_options` + nonce. Handled by `Admin\Languages\LanguagesScreen`. Curated adds derive `code`/`name`/`native_name`/`direction` server-side; those POST fields are ignored. |
 | `admin_post_aiml_delete_language` | `manage_options` + nonce |
 | `admin_post_aiml_save_translation` | `aiml_translate` + nonce |
 
@@ -93,6 +96,7 @@ reachable while logged out.
 | Filter | Default | Purpose |
 |---|---|---|
 | `aiml_switcher_in_menu` | `false` | Whether to append the language switcher to a given nav menu. Receives the `wp_nav_menu()` args. |
+| `aiml_allow_custom_language` | `true` | Whether the "Advanced: custom language" raw-field path on the Languages screen is available. When `false`, the disclosure is hidden and a custom-language POST is refused. |
 
 ## Translator workspace REST — `src/Rest/WorkspaceController.php`
 

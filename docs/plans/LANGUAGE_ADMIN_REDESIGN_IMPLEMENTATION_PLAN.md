@@ -1,6 +1,8 @@
-# LANGUAGE ADMIN REDESIGN — Implementation Plan (FROZEN)
+# LANGUAGE ADMIN REDESIGN — Implementation Plan (IMPLEMENTED)
 
-**Status:** FROZEN for implementation
+**Status:** IMPLEMENTED on `feature/language-admin-redesign` — awaiting milestone
+acceptance. No release (WP9) performed. Validation:
+[LANGUAGE_ADMIN_REDESIGN_VALIDATION_LOG.md](LANGUAGE_ADMIN_REDESIGN_VALIDATION_LOG.md).
 **External review:** PASS — approved and frozen (5 review rounds)
 **Canonical authority:** this document in `magpern/universal-multilingual`
 **Scope:** Universal Multilingual only. Do not modify Universal Multicurrency,

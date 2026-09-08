@@ -27,6 +27,16 @@ use WP_Error;
 final class LanguagesScreen {
 
 	/**
+	 * Enqueue handle for the screen's stylesheet and script.
+	 */
+	public const ASSET_HANDLE = 'aiml-languages-admin';
+
+	/**
+	 * Body class the screen's CSS is scoped under.
+	 */
+	public const BODY_CLASS = 'aiml-languages-page';
+
+	/**
 	 * Language configuration.
 	 *
 	 * @var Languages
@@ -43,12 +53,69 @@ final class LanguagesScreen {
 	}
 
 	/**
-	 * Registers the form handlers. The menu entry itself is registered by
-	 * SettingsPage, which owns the plugin's top-level menu.
+	 * Registers the form handlers and screen assets. The menu entry itself is
+	 * registered by SettingsPage, which owns the plugin's top-level menu.
 	 */
 	public function register(): void {
 		add_action( 'admin_post_aiml_save_language', array( $this, 'handle_save' ) );
 		add_action( 'admin_post_aiml_delete_language', array( $this, 'handle_delete' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'admin_body_class', array( $this, 'body_class' ) );
+	}
+
+	/**
+	 * Hook suffixes under which the Languages screen renders.
+	 *
+	 * @return string[]
+	 */
+	private function screen_hooks(): array {
+		return array(
+			'toplevel_page_' . SettingsPage::MENU_SLUG,
+			'multilingual_page_' . SettingsPage::MENU_SLUG,
+		);
+	}
+
+	/**
+	 * Enqueues the screen's stylesheet and combobox script, and only there.
+	 *
+	 * @param string $hook_suffix Current admin page hook suffix.
+	 */
+	public function enqueue_assets( string $hook_suffix ): void {
+		if ( ! in_array( $hook_suffix, $this->screen_hooks(), true ) ) {
+			return;
+		}
+
+		$version = defined( 'AIML_VERSION' ) ? AIML_VERSION : '0.1.0';
+
+		wp_enqueue_style( 'wp-components' );
+		wp_enqueue_style(
+			self::ASSET_HANDLE,
+			plugins_url( 'assets/languages-admin/languages-admin.css', AIML_PLUGIN_FILE ),
+			array( 'wp-components' ),
+			$version
+		);
+		wp_enqueue_script(
+			self::ASSET_HANDLE,
+			plugins_url( 'assets/languages-admin/languages-admin.js', AIML_PLUGIN_FILE ),
+			array( 'wp-element', 'wp-components' ),
+			$version,
+			true
+		);
+	}
+
+	/**
+	 * Adds the scoping body class on the Languages screen.
+	 *
+	 * @param string $classes Space-separated admin body classes.
+	 */
+	public function body_class( string $classes ): string {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		if ( null !== $screen && in_array( (string) $screen->id, $this->screen_hooks(), true ) ) {
+			$classes .= ' ' . self::BODY_CLASS;
+		}
+
+		return $classes;
 	}
 
 	/**

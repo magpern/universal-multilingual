@@ -89,13 +89,18 @@ final class Languages {
 	/**
 	 * Whether a URL code is well formed.
 	 *
-	 * Accepts `sv` and `pt-br`. The code becomes a URL path segment, so it is
-	 * restricted to lowercase ASCII to keep routing unambiguous.
+	 * The grammar is `language` / `language-region` / `language-region-variant`
+	 * (ADR-0029): a two- or three-letter language, an optional two-letter
+	 * region, and — only with a region — an optional variant segment. Examples:
+	 * `sv`, `pt-br`, `ceb`, `de-de-formal`, `pt-pt-ao90`. The code is used
+	 * verbatim as the first URL path segment, so it is restricted to lowercase
+	 * ASCII to keep routing unambiguous. It is derived once at creation and
+	 * immutable afterward.
 	 *
 	 * @param string $code Candidate code.
 	 */
 	public static function is_valid_code( string $code ): bool {
-		return 1 === preg_match( '/^[a-z]{2}(-[a-z]{2})?$/', $code );
+		return 1 === preg_match( '/^[a-z]{2,3}(-[a-z]{2}(-[a-z0-9]+)?)?$/', $code );
 	}
 
 	/**

@@ -33,18 +33,26 @@ final class LanguageValidationTest extends TestCase {
 	 */
 	public function provide_codes(): array {
 		return array(
-			'two letters'       => array( 'sv', true ),
-			'with region'       => array( 'pt-br', true ),
-			'uppercase'         => array( 'SV', false ),
-			'mixed case'        => array( 'pt-BR', false ),
-			'too short'         => array( 's', false ),
-			'too long'          => array( 'svenska', false ),
-			'underscore region' => array( 'pt_br', false ),
-			'path traversal'    => array( '../', false ),
-			'slash'             => array( 'sv/se', false ),
-			'empty'             => array( '', false ),
-			'digits'            => array( 's1', false ),
-			'leading space'     => array( ' sv', false ),
+			'two letters'         => array( 'sv', true ),
+			'three letters'       => array( 'ceb', true ),
+			'with region'         => array( 'pt-br', true ),
+			'region and variant'  => array( 'de-de-formal', true ),
+			'variant with digits' => array( 'pt-pt-ao90', true ),
+			'informal variant'    => array( 'de-ch-informal', true ),
+			'uppercase'           => array( 'SV', false ),
+			'mixed case'          => array( 'pt-BR', false ),
+			'too short'           => array( 's', false ),
+			'too long'            => array( 'svenska', false ),
+			'four letter lang'    => array( 'test', false ),
+			'underscore region'   => array( 'pt_br', false ),
+			'double hyphen'       => array( 'de--formal', false ),
+			'trailing hyphen'     => array( 'de-', false ),
+			'three letter region' => array( 'de-deu-formal', false ),
+			'path traversal'      => array( '../', false ),
+			'slash'               => array( 'sv/se', false ),
+			'empty'               => array( '', false ),
+			'digits'              => array( 's1', false ),
+			'leading space'       => array( ' sv', false ),
 		);
 	}
 

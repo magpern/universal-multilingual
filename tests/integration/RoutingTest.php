@@ -48,6 +48,18 @@ final class RoutingTest extends AimlTestCase {
 		$this->assertSame( (int) $post->ID, (int) get_queried_object_id() );
 	}
 
+	public function test_three_segment_code_resolves_and_strips(): void {
+		$formal = $this->add_language( 'de-de-formal', 'de_DE_formal' );
+		$post   = $this->create_page( 'Impressum' );
+
+		$router = $this->route( '/de-de-formal/' . $post->post_name . '/' );
+
+		$this->assertTrue( $router->is_prefixed() );
+		$this->assertSame( 'de-de-formal', $this->context->current()->code );
+		$this->assertSame( (int) $formal->language_id, $this->context->current_id() );
+		$this->assertSame( '/' . $post->post_name . '/', $_SERVER['REQUEST_URI'] );
+	}
+
 	public function test_unprefixed_url_stays_in_the_default_language(): void {
 		$this->add_language();
 		$post = $this->create_page( 'About Us' );

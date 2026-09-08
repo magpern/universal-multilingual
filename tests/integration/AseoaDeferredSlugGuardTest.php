@@ -23,7 +23,7 @@ use ReflectionClass;
 final class AseoaDeferredSlugGuardTest extends AimlTestCase {
 
 	public function test_target_is_eight(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 	}
 
 	public function test_term_identity_exists_without_slug_translation(): void {

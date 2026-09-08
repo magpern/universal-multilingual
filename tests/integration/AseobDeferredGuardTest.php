@@ -20,7 +20,7 @@ use ReflectionClass;
 final class AseobDeferredGuardTest extends AimlTestCase {
 
 	public function test_target_remains_six(): void {
-		$this->assertSame( Migrator::TARGET, 8 );
+		$this->assertSame( Migrator::TARGET, 9 );
 	}
 
 	public function test_mseo_foundation_tables_exist_without_aseob_deferred_emitters(): void {

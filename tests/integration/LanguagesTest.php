@@ -47,6 +47,45 @@ final class LanguagesTest extends AimlTestCase {
 		$this->assertSame( 'aiml_duplicate_code', $second->get_error_code() );
 	}
 
+	public function test_locales_are_unique_on_insert(): void {
+		$this->add_language( 'sv', 'sv_SE' );
+
+		$second = $this->languages->insert(
+			array(
+				'code'   => 'se',
+				'locale' => 'sv_SE',
+				'name'   => 'Swedish clone',
+			)
+		);
+
+		$this->assertInstanceOf( WP_Error::class, $second );
+		$this->assertSame( 'aiml_duplicate_locale', $second->get_error_code() );
+	}
+
+	public function test_update_cannot_take_another_rows_locale(): void {
+		$this->add_language( 'sv', 'sv_SE' );
+		$german = $this->add_language( 'de', 'de_DE' );
+
+		$result = $this->languages->update( (int) $german->language_id, array( 'locale' => 'sv_SE' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'aiml_duplicate_locale', $result->get_error_code() );
+	}
+
+	public function test_update_may_keep_its_own_locale(): void {
+		$german = $this->add_language( 'de', 'de_DE' );
+
+		$this->assertTrue(
+			$this->languages->update(
+				(int) $german->language_id,
+				array(
+					'sort_order' => 5,
+					'locale'     => 'de_DE',
+				)
+			)
+		);
+	}
+
 	public function test_invalid_code_is_rejected(): void {
 		$result = $this->languages->insert(
 			array(

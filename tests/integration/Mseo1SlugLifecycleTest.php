@@ -111,7 +111,7 @@ final class Mseo1SlugLifecycleTest extends AimlTestCase {
 	}
 
 	public function test_migrator_target_stays_eight(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 	}
 
 	public function test_extract_emits_post_name(): void {

@@ -23,7 +23,7 @@ final class MseoSchemaTest extends AimlTestCase {
 	}
 
 	public function test_schema_target_is_eight(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
 	}
 
@@ -117,7 +117,7 @@ final class MseoSchemaTest extends AimlTestCase {
 		$migrator->maybe_migrate();
 		$migrator->maybe_migrate();
 
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 		$this->assertSame( Migrator::TARGET, $migrator->current_version() );
 		$this->assertSame(
 			Schema::slug_routes(),

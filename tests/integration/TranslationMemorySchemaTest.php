@@ -25,7 +25,7 @@ final class TranslationMemorySchemaTest extends AimlTestCase {
 
 		$this->assertSame( $table, $found );
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 	}
 
 	public function test_tm_table_has_origin_and_identity_index(): void {

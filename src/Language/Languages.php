@@ -247,6 +247,27 @@ final class Languages {
 	}
 
 	/**
+	 * Finds a language by WordPress locale.
+	 *
+	 * A locale identifies exactly one language: two rows sharing a locale would
+	 * load the same translation files and is rejected on write (and, from
+	 * schema 9, by a UNIQUE KEY).
+	 *
+	 * @param string $locale WordPress locale, e.g. `sv_SE`.
+	 */
+	public function find_by_locale( string $locale ): ?object {
+		$locale = trim( $locale );
+
+		foreach ( $this->all() as $language ) {
+			if ( (string) $language->locale === $locale ) {
+				return $language;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * The default (source) language, or null before one is seeded.
 	 */
 	public function default(): ?object {
@@ -277,6 +298,13 @@ final class Languages {
 			return new WP_Error(
 				'aiml_duplicate_code',
 				__( 'A language with that code already exists.', 'universal-multilingual' )
+			);
+		}
+
+		if ( null !== $this->find_by_locale( $clean['locale'] ) ) {
+			return new WP_Error(
+				'aiml_duplicate_locale',
+				__( 'A language with that locale already exists.', 'universal-multilingual' )
 			);
 		}
 
@@ -348,6 +376,14 @@ final class Languages {
 			return new WP_Error(
 				'aiml_duplicate_code',
 				__( 'A language with that code already exists.', 'universal-multilingual' )
+			);
+		}
+
+		$locale_duplicate = $this->find_by_locale( $clean['locale'] );
+		if ( null !== $locale_duplicate && (int) $locale_duplicate->language_id !== $language_id ) {
+			return new WP_Error(
+				'aiml_duplicate_locale',
+				__( 'A language with that locale already exists.', 'universal-multilingual' )
 			);
 		}
 

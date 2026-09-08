@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace AIMultilingual\Tests\Integration;
 
 use AIMultilingual\Admin\Editor;
+use AIMultilingual\Admin\Languages\LanguagesScreen;
 use AIMultilingual\Admin\SettingsPage;
 use AIMultilingual\Plugin;
 
@@ -28,6 +29,31 @@ final class AdminAuthorizationTest extends AimlTestCase {
 			$this->assertNotFalse(
 				has_action( 'admin_post_' . $action ),
 				"Handler for {$action} should be registered."
+			);
+		}
+	}
+
+	/**
+	 * The language write handlers now live on LanguagesScreen (extracted from
+	 * SettingsPage), which SettingsPage still registers.
+	 */
+	public function test_language_handlers_resolve_to_the_languages_screen(): void {
+		( new SettingsPage( new \AIMultilingual\Settings( array() ), $this->languages ) )->register();
+
+		foreach ( array( 'aiml_save_language', 'aiml_delete_language' ) as $action ) {
+			$callbacks = $GLOBALS['wp_filter'][ 'admin_post_' . $action ]->callbacks ?? array();
+			$handler   = null;
+			foreach ( $callbacks as $priority ) {
+				foreach ( $priority as $entry ) {
+					$handler = $entry['function'];
+				}
+			}
+
+			$this->assertIsArray( $handler, "{$action} must be an object method callback." );
+			$this->assertInstanceOf(
+				LanguagesScreen::class,
+				$handler[0],
+				"{$action} must be handled by LanguagesScreen."
 			);
 		}
 	}

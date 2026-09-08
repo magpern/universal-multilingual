@@ -10,19 +10,27 @@ declare( strict_types=1 );
 namespace AIMultilingual\Admin\Languages;
 
 use AIMultilingual\Admin\SettingsPage;
+use AIMultilingual\Language\DerivedLanguageMetadata;
+use AIMultilingual\Language\ExistingLanguage;
+use AIMultilingual\Language\LanguageRegistry;
 use AIMultilingual\Language\Languages;
 use WP_Error;
 
 /**
- * The Languages list, add and edit screen.
+ * The Languages list, add and edit screen, redesigned around selection
+ * (ADR-0028, ADR-0029).
  *
- * Extracted verbatim from SettingsPage so the screen has a focused home before
- * the selection-based redesign. Behaviour is unchanged: the same menu slug and
- * hook suffixes, the same `admin-post.php` handlers, the same nonce and
- * `manage_options` checks, the same rendered markup and redirects.
+ * Adding a curated language is a choice, not data entry: the administrator
+ * picks a language (and a region where the language has more than one locale),
+ * a status and a sort order. The server derives the URL code, English name,
+ * native name and text direction from the curated registry — it never trusts
+ * the browser for those. A gated "Advanced: custom language" disclosure keeps
+ * the old raw-field path for locales outside the registry.
  *
- * Milestone 1 ships no REST API for this screen (ADR-0002); writes go through
- * `admin-post.php`. Every write checks both a nonce and `manage_options`.
+ * On editing, `locale` and `code` are immutable for every row; changing either
+ * means delete + re-add. Milestone 1 ships no REST API for this screen
+ * (ADR-0002); writes go through `admin-post.php` with a nonce and
+ * `manage_options`.
  */
 final class LanguagesScreen {
 
@@ -44,12 +52,21 @@ final class LanguagesScreen {
 	private Languages $languages;
 
 	/**
+	 * Canonical locale metadata.
+	 *
+	 * @var LanguageRegistry
+	 */
+	private LanguageRegistry $registry;
+
+	/**
 	 * Builds the languages screen.
 	 *
-	 * @param Languages $languages Language configuration.
+	 * @param Languages             $languages Language configuration.
+	 * @param LanguageRegistry|null $registry  Canonical locale metadata.
 	 */
-	public function __construct( Languages $languages ) {
+	public function __construct( Languages $languages, ?LanguageRegistry $registry = null ) {
 		$this->languages = $languages;
+		$this->registry  = $registry ?? new LanguageRegistry();
 	}
 
 	/**
@@ -101,6 +118,7 @@ final class LanguagesScreen {
 			$version,
 			true
 		);
+		wp_localize_script( self::ASSET_HANDLE, 'aimlLanguagesAdmin', $this->js_payload() );
 	}
 
 	/**
@@ -119,6 +137,79 @@ final class LanguagesScreen {
 	}
 
 	/**
+	 * The registry / existing-language blob the combobox script reads.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function js_payload(): array {
+		$existing = $this->existing_identities();
+
+		$groups = array();
+		foreach ( $this->registry->groups() as $group ) {
+			$groups[ $group->key ] = array(
+				'language_code' => $group->language_code,
+				'english_name'  => $group->english_name,
+				'native_name'   => $group->native_name,
+				'direction'     => $group->direction,
+				'locales'       => $group->locales,
+			);
+		}
+
+		$locales = array();
+		foreach ( $this->registry->groups() as $group ) {
+			foreach ( $this->registry->locales_for( $group->key ) as $meta ) {
+				$derived = DerivedLanguageMetadata::derive( $meta->locale, $group->key, $existing, null, $this->registry );
+
+				$locales[ $meta->locale ] = array(
+					'language_code' => $meta->language_code,
+					'english_name'  => $meta->english_name,
+					'native_name'   => $meta->native_name,
+					'direction'     => $meta->direction,
+					'region'        => $meta->region,
+					'region_label'  => $meta->region_label,
+					'preview_code'  => is_wp_error( $derived ) ? $group->language_code : $derived['code'],
+				);
+			}
+		}
+
+		$existing_js = array();
+		foreach ( $existing as $row ) {
+			$existing_js[] = array(
+				'code'       => $row->code,
+				'locale'     => $row->locale,
+				'group'      => $row->group,
+				'is_default' => $row->is_default,
+			);
+		}
+
+		return array(
+			'groups'   => $groups,
+			'locales'  => $locales,
+			'existing' => $existing_js,
+			'i18n'     => array(
+				'languageLabel' => __( 'Language', 'universal-multilingual' ),
+				'rtl'           => __( 'Right to left', 'universal-multilingual' ),
+				'ltr'           => __( 'Left to right', 'universal-multilingual' ),
+				'alreadyAdded'  => __( 'already added', 'universal-multilingual' ),
+			),
+		);
+	}
+
+	/**
+	 * Identities of the languages already stored, for URL-code derivation.
+	 *
+	 * @return ExistingLanguage[]
+	 */
+	private function existing_identities(): array {
+		$out = array();
+		foreach ( $this->languages->all() as $row ) {
+			$out[] = ExistingLanguage::from_row( $row, $this->registry );
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Renders the Languages screen.
 	 */
 	public function render(): void {
@@ -126,9 +217,7 @@ final class LanguagesScreen {
 			wp_die( esc_html__( 'You do not have permission to manage languages.', 'universal-multilingual' ) );
 		}
 
-		$languages = $this->languages->all();
-		$editing   = null;
-
+		$editing = null;
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only screen state.
 		if ( isset( $_GET['language_id'] ) ) {
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -137,26 +226,66 @@ final class LanguagesScreen {
 
 		echo '<div class="wrap">';
 		echo '<h1>' . esc_html__( 'Languages', 'universal-multilingual' ) . '</h1>';
+		echo '<div class="aiml-ui-layout">';
 
+		$this->render_hero();
 		$this->render_notice();
+		$this->render_list();
 
-		echo '<table class="widefat striped" style="margin-bottom:2em;">';
-		echo '<thead><tr>';
-		echo '<th>' . esc_html__( 'Code', 'universal-multilingual' ) . '</th>';
-		echo '<th>' . esc_html__( 'Locale', 'universal-multilingual' ) . '</th>';
-		echo '<th>' . esc_html__( 'Name', 'universal-multilingual' ) . '</th>';
-		echo '<th>' . esc_html__( 'State', 'universal-multilingual' ) . '</th>';
-		echo '<th>' . esc_html__( 'Default', 'universal-multilingual' ) . '</th>';
-		echo '<th>' . esc_html__( 'Actions', 'universal-multilingual' ) . '</th>';
+		if ( null !== $editing ) {
+			$this->render_edit_card( $editing );
+		} else {
+			$this->render_add_card();
+			$this->render_custom_form();
+		}
+
+		echo '</div></div>';
+	}
+
+	/**
+	 * The header hero.
+	 */
+	private function render_hero(): void {
+		echo '<header class="aiml-ui-hero">';
+		echo '<span class="aiml-ui-hero__mark"><span class="dashicons dashicons-translation" aria-hidden="true"></span></span>';
+		echo '<span class="aiml-ui-hero__titles">';
+		echo '<h2 class="aiml-ui-hero__title">' . esc_html__( 'Languages', 'universal-multilingual' ) . '</h2>';
+		echo '<p class="aiml-ui-hero__subtitle">' . esc_html__( 'The languages this site is translated into, and the order they appear in the switcher.', 'universal-multilingual' ) . '</p>';
+		echo '</span></header>';
+	}
+
+	/**
+	 * The list of configured languages.
+	 */
+	private function render_list(): void {
+		$languages = $this->languages->all();
+
+		echo '<div class="aiml-ui-card"><div class="aiml-ui-card__body">';
+
+		if ( count( $languages ) < 2 ) {
+			echo '<p class="aiml-ui-empty">' . esc_html__( 'Only the site language is configured. Add a language below to start translating.', 'universal-multilingual' ) . '</p>';
+		}
+
+		echo '<table class="aiml-ui-list"><thead><tr>';
+		foreach ( array(
+			__( 'Code', 'universal-multilingual' ),
+			__( 'Locale', 'universal-multilingual' ),
+			__( 'Name', 'universal-multilingual' ),
+			__( 'State', 'universal-multilingual' ),
+			__( 'Default', 'universal-multilingual' ),
+			__( 'Actions', 'universal-multilingual' ),
+		) as $heading ) {
+			echo '<th>' . esc_html( $heading ) . '</th>';
+		}
 		echo '</tr></thead><tbody>';
 
 		foreach ( $languages as $language ) {
 			echo '<tr>';
 			echo '<td><code>' . esc_html( (string) $language->code ) . '</code></td>';
-			echo '<td>' . esc_html( (string) $language->locale ) . '</td>';
+			echo '<td><code>' . esc_html( (string) $language->locale ) . '</code></td>';
 			echo '<td>' . esc_html( (string) $language->name ) . '</td>';
-			echo '<td>' . esc_html( $this->status_label( (string) $language->status ) ) . '</td>';
-			echo '<td>' . ( $language->is_default ? '&#10003;' : '' ) . '</td>';
+			echo '<td>' . $this->status_badge( (string) $language->status ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from esc_html.
+			echo '<td>' . ( $language->is_default ? '<span aria-hidden="true">&#10003;</span><span class="screen-reader-text">' . esc_html__( 'Site language', 'universal-multilingual' ) . '</span>' : '' ) . '</td>';
 			echo '<td>';
 
 			printf(
@@ -197,15 +326,274 @@ final class LanguagesScreen {
 			echo '</td></tr>';
 		}
 
-		echo '</tbody></table>';
-
-		$this->render_form( $editing );
-
-		echo '</div>';
+		echo '</tbody></table></div></div>';
 	}
 
 	/**
+	 * The selection-based "Add a language" card.
+	 */
+	private function render_add_card(): void {
+		$used_locales = array();
+		foreach ( $this->languages->all() as $row ) {
+			$used_locales[] = (string) $row->locale;
+		}
+
+		$this->card_open(
+			__( 'Add a language', 'universal-multilingual' ),
+			__( 'Choose a language. The URL, locale, name and text direction are filled in for you.', 'universal-multilingual' )
+		);
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<input type="hidden" name="action" value="aiml_save_language" />';
+		wp_nonce_field( 'aiml_save_language' );
+
+		echo '<div class="aiml-ui-field">';
+		echo '<label class="aiml-ui-field__label" for="aiml-language-select">' . esc_html__( 'Language', 'universal-multilingual' ) . '</label>';
+		echo '<span class="aiml-ui-field__description">' . esc_html__( 'Search by English or native name.', 'universal-multilingual' ) . '</span>';
+		echo '<div class="aiml-ui-field__control"><div class="aiml-language-combobox"></div>';
+		echo '<select id="aiml-language-select" name="registry_group" class="aiml-language-select-fallback">';
+		foreach ( $this->registry->groups() as $group ) {
+			if ( array() === array_diff( $group->locales, $used_locales ) ) {
+				continue; // Every locale in this group is already registered.
+			}
+			printf(
+				'<option value="%1$s">%2$s &mdash; %3$s</option>',
+				esc_attr( $group->key ),
+				esc_html( $group->english_name ),
+				esc_html( $group->native_name )
+			);
+		}
+		echo '</select></div></div>';
+
+		echo '<div class="aiml-ui-field aiml-ui-field--hidden" data-aiml-region-field>';
+		echo '<label class="aiml-ui-field__label" for="aiml-region-select">' . esc_html__( 'Regional variant', 'universal-multilingual' ) . '</label>';
+		echo '<div class="aiml-ui-field__control"><select id="aiml-region-select" name="locale"></select></div>';
+		echo '</div>';
+
+		echo '<div class="aiml-ui-summary" data-aiml-summary hidden>';
+		echo '<p class="aiml-ui-summary__title">' . esc_html__( 'This language will be added as', 'universal-multilingual' ) . '</p>';
+		echo '<dl class="aiml-ui-summary__grid">';
+		echo '<dt>' . esc_html__( 'URL prefix', 'universal-multilingual' ) . '</dt><dd><code data-aiml-summary-url></code></dd>';
+		echo '<dt>' . esc_html__( 'Locale', 'universal-multilingual' ) . '</dt><dd><code data-aiml-summary-locale></code></dd>';
+		echo '<dt>' . esc_html__( 'Native name', 'universal-multilingual' ) . '</dt><dd data-aiml-summary-native></dd>';
+		echo '<dt>' . esc_html__( 'Direction', 'universal-multilingual' ) . '</dt><dd data-aiml-summary-direction></dd>';
+		echo '</dl></div>';
+
+		$this->status_field( Languages::STATUS_PREVIEW );
+		$this->sort_order_field( $this->next_sort_order() );
+
+		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Add language', 'universal-multilingual' ) . '</button></p>';
+		echo '</form>';
+
+		$this->card_close();
+	}
+
+	/**
+	 * The edit card for one language.
+	 *
+	 * @param object $editing Language row.
+	 */
+	private function render_edit_card( object $editing ): void {
+		$is_default   = ! empty( $editing->is_default );
+		$stored_group = $this->registry->group_for_locale( (string) $editing->locale );
+		$is_curated   = null !== $stored_group;
+
+		$this->card_open(
+			/* translators: %s: language name. */
+			sprintf( __( 'Edit %s', 'universal-multilingual' ), (string) $editing->name ),
+			__( 'The locale and URL code are fixed once a language exists — changing them would break every translated URL. To change them, delete this language and add it again.', 'universal-multilingual' )
+		);
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<input type="hidden" name="action" value="aiml_save_language" />';
+		echo '<input type="hidden" name="language_id" value="' . esc_attr( (string) (int) $editing->language_id ) . '" />';
+		if ( ! $is_curated ) {
+			echo '<input type="hidden" name="aiml_custom" value="1" />';
+		}
+		wp_nonce_field( 'aiml_save_language' );
+
+		echo '<div class="aiml-ui-summary">';
+		echo '<dl class="aiml-ui-summary__grid">';
+		echo '<dt>' . esc_html__( 'URL code', 'universal-multilingual' ) . '</dt><dd><code>' . esc_html( (string) $editing->code ) . '</code></dd>';
+		echo '<dt>' . esc_html__( 'Locale', 'universal-multilingual' ) . '</dt><dd><code>' . esc_html( (string) $editing->locale ) . '</code></dd>';
+		echo '</dl></div>';
+
+		if ( $is_curated ) {
+			$this->text_field( 'native_name', __( 'Native name', 'universal-multilingual' ), (string) $editing->native_name, __( 'Shown in the language switcher. Leave blank to use the standard name.', 'universal-multilingual' ) );
+		} else {
+			$this->text_field( 'name', __( 'Name', 'universal-multilingual' ), (string) $editing->name, __( 'English name.', 'universal-multilingual' ) );
+			$this->text_field( 'native_name', __( 'Native name', 'universal-multilingual' ), (string) $editing->native_name, __( 'The language in its own words.', 'universal-multilingual' ) );
+			$this->direction_field( (string) $editing->direction );
+		}
+
+		if ( $is_default ) {
+			echo '<div class="aiml-ui-field"><span class="aiml-ui-field__label">' . esc_html__( 'Status', 'universal-multilingual' ) . '</span>';
+			echo '<span class="aiml-ui-field__description">' . esc_html__( 'The site language is always published and always unprefixed.', 'universal-multilingual' ) . '</span></div>';
+		} else {
+			$this->status_field( (string) $editing->status );
+		}
+
+		$this->sort_order_field( (int) $editing->sort_order );
+
+		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Save changes', 'universal-multilingual' ) . '</button></p>';
+		echo '</form>';
+
+		$this->card_close();
+	}
+
+	/**
+	 * The gated raw-field form for locales outside the registry.
+	 */
+	private function render_custom_form(): void {
+		/**
+		 * Filters whether the "Advanced: custom language" path is available.
+		 *
+		 * @since 1.13.0
+		 *
+		 * @param bool $allowed Default true.
+		 */
+		if ( ! (bool) apply_filters( 'aiml_allow_custom_language', true ) ) {
+			return;
+		}
+
+		echo '<details class="aiml-ui-advanced">';
+		echo '<summary>' . esc_html__( 'Advanced: add a custom language', 'universal-multilingual' ) . '</summary>';
+		echo '<p class="description">' . esc_html__( 'For locales not in the standard list. You provide every value; nothing is derived. URL codes must be lowercase, like sv or pt-br.', 'universal-multilingual' ) . '</p>';
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<input type="hidden" name="action" value="aiml_save_language" />';
+		echo '<input type="hidden" name="aiml_custom" value="1" />';
+		wp_nonce_field( 'aiml_save_language' );
+
+		$this->text_field( 'code', __( 'URL code', 'universal-multilingual' ), '', __( 'For example sv, pt-br or de-de-formal.', 'universal-multilingual' ) );
+		$this->text_field( 'locale', __( 'Locale', 'universal-multilingual' ), '', __( 'WordPress locale, for example sv_SE.', 'universal-multilingual' ) );
+		$this->text_field( 'name', __( 'Name', 'universal-multilingual' ), '', __( 'English name.', 'universal-multilingual' ) );
+		$this->text_field( 'native_name', __( 'Native name', 'universal-multilingual' ), '', __( 'The language in its own words.', 'universal-multilingual' ) );
+		$this->direction_field( 'ltr' );
+		$this->status_field( Languages::STATUS_PREVIEW );
+		$this->sort_order_field( $this->next_sort_order() );
+
+		echo '<p><button type="submit" class="button button-secondary">' . esc_html__( 'Add custom language', 'universal-multilingual' ) . '</button></p>';
+		echo '</form></details>';
+	}
+
+	// -- Field partials --
+
+	/**
+	 * Opens a settings card.
+	 *
+	 * @param string $title       Card title.
+	 * @param string $description Card description.
+	 */
+	private function card_open( string $title, string $description ): void {
+		echo '<div class="aiml-ui-card"><div class="aiml-ui-card__header">';
+		echo '<h2 class="aiml-ui-card__title">' . esc_html( $title ) . '</h2>';
+		echo '<p class="aiml-ui-card__description">' . esc_html( $description ) . '</p>';
+		echo '</div><div class="aiml-ui-card__divider"></div><div class="aiml-ui-card__body">';
+	}
+
+	/**
+	 * Closes a settings card.
+	 */
+	private function card_close(): void {
+		echo '</div></div>';
+	}
+
+	/**
+	 * A labelled text input field.
+	 *
+	 * @param string $name        Field name.
+	 * @param string $label       Field label.
+	 * @param string $value       Current value.
+	 * @param string $description Help text.
+	 */
+	private function text_field( string $name, string $label, string $value, string $description ): void {
+		printf(
+			'<div class="aiml-ui-field"><label class="aiml-ui-field__label" for="aiml-%1$s">%2$s</label>'
+			. '<span class="aiml-ui-field__description">%4$s</span>'
+			. '<div class="aiml-ui-field__control"><input type="text" id="aiml-%1$s" name="%1$s" value="%3$s" class="regular-text" /></div></div>',
+			esc_attr( $name ),
+			esc_html( $label ),
+			esc_attr( $value ),
+			esc_html( $description )
+		);
+	}
+
+	/**
+	 * The status select.
+	 *
+	 * @param string $current Selected status.
+	 */
+	private function status_field( string $current ): void {
+		echo '<div class="aiml-ui-field"><label class="aiml-ui-field__label" for="aiml-status">' . esc_html__( 'Status', 'universal-multilingual' ) . '</label>';
+		echo '<span class="aiml-ui-field__description">' . esc_html__( 'Preview: visible only to translators. Published: visible to everyone. Disabled: not routed at all.', 'universal-multilingual' ) . '</span>';
+		echo '<div class="aiml-ui-field__control"><select id="aiml-status" name="status">';
+		foreach ( Languages::statuses() as $status ) {
+			printf(
+				'<option value="%1$s"%2$s>%3$s</option>',
+				esc_attr( $status ),
+				selected( $current, $status, false ),
+				esc_html( $this->status_label( $status ) )
+			);
+		}
+		echo '</select></div></div>';
+	}
+
+	/**
+	 * The text-direction select (custom mode only).
+	 *
+	 * @param string $current Selected direction.
+	 */
+	private function direction_field( string $current ): void {
+		echo '<div class="aiml-ui-field"><label class="aiml-ui-field__label" for="aiml-direction">' . esc_html__( 'Text direction', 'universal-multilingual' ) . '</label>';
+		echo '<div class="aiml-ui-field__control"><select id="aiml-direction" name="direction">';
+		foreach ( Languages::DIRECTIONS as $direction ) {
+			printf(
+				'<option value="%1$s"%2$s>%1$s</option>',
+				esc_attr( $direction ),
+				selected( $current, $direction, false )
+			);
+		}
+		echo '</select></div></div>';
+	}
+
+	/**
+	 * The sort-order number field.
+	 *
+	 * @param int $current Current value.
+	 */
+	private function sort_order_field( int $current ): void {
+		printf(
+			'<div class="aiml-ui-field"><label class="aiml-ui-field__label" for="aiml-sort-order">%1$s</label>'
+			. '<span class="aiml-ui-field__description">%2$s</span>'
+			. '<div class="aiml-ui-field__control"><input type="number" id="aiml-sort-order" name="sort_order" value="%3$s" min="0" step="1" /></div></div>',
+			esc_html__( 'Sort order', 'universal-multilingual' ),
+			esc_html__( 'Position in the language switcher.', 'universal-multilingual' ),
+			absint( $current )
+		);
+	}
+
+	/**
+	 * The next unused sort order (max + 10, rounded), for new languages.
+	 */
+	private function next_sort_order(): int {
+		$max = 0;
+		foreach ( $this->languages->all() as $row ) {
+			$max = max( $max, (int) $row->sort_order );
+		}
+
+		return $max + 10;
+	}
+
+	// -- Write handlers --
+
+	/**
 	 * Creates or updates a language from the add/edit form.
+	 *
+	 * The nonce and capability are checked here; the whole submission is read
+	 * and sanitised once, then dispatched to the branch that owns it. Canonical
+	 * fields (`code`, `locale`, `name`, `direction`) submitted for a curated
+	 * language are ignored — the server derives them.
 	 */
 	public function handle_save(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -214,23 +602,159 @@ final class LanguagesScreen {
 
 		check_admin_referer( 'aiml_save_language' );
 
-		$language_id = isset( $_POST['language_id'] ) ? (int) $_POST['language_id'] : 0;
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce verified immediately above.
+		$post = array(
+			'language_id'    => isset( $_POST['language_id'] ) ? (int) $_POST['language_id'] : 0,
+			'is_custom'      => ! empty( $_POST['aiml_custom'] ),
+			'registry_group' => isset( $_POST['registry_group'] ) ? sanitize_text_field( wp_unslash( $_POST['registry_group'] ) ) : '',
+			'locale'         => isset( $_POST['locale'] ) ? sanitize_text_field( wp_unslash( $_POST['locale'] ) ) : '',
+			'code'           => isset( $_POST['code'] ) ? sanitize_text_field( wp_unslash( $_POST['code'] ) ) : '',
+			'has_name'       => isset( $_POST['name'] ),
+			'name'           => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '',
+			'native_name'    => isset( $_POST['native_name'] ) ? sanitize_text_field( wp_unslash( $_POST['native_name'] ) ) : '',
+			'has_direction'  => isset( $_POST['direction'] ),
+			'direction'      => isset( $_POST['direction'] ) ? sanitize_text_field( wp_unslash( $_POST['direction'] ) ) : 'ltr',
+			'status'         => isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : Languages::STATUS_PREVIEW,
+			'sort_order'     => isset( $_POST['sort_order'] ) ? max( 0, (int) $_POST['sort_order'] ) : 0,
+		);
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		if ( $post['language_id'] > 0 ) {
+			$this->handle_edit( $post );
+			return;
+		}
+
+		if ( $post['is_custom'] ) {
+			$this->handle_custom_add( $post );
+			return;
+		}
+
+		$this->handle_curated_add( $post );
+	}
+
+	/**
+	 * Curated add: the server derives every canonical field from the selection.
+	 *
+	 * @param array<string, mixed> $post Sanitised submission.
+	 */
+	private function handle_curated_add( array $post ): void {
+		$group  = (string) $post['registry_group'];
+		$locale = (string) $post['locale'];
+
+		$group_meta = $this->registry->group( $group );
+		if ( null === $group_meta ) {
+			$this->redirect_with_result(
+				new WP_Error( 'aiml_unknown_locale', __( 'Choose a language from the list.', 'universal-multilingual' ) )
+			);
+			return;
+		}
+
+		if ( '' === $locale || $this->registry->group_for_locale( $locale ) !== $group ) {
+			$locale = $group_meta->locales[0] ?? '';
+		}
+
+		$derived = DerivedLanguageMetadata::derive( $locale, $group, $this->existing_identities(), null, $this->registry );
+		if ( is_wp_error( $derived ) ) {
+			$this->redirect_with_result( $derived );
+			return;
+		}
+
+		$this->redirect_with_result(
+			$this->languages->insert(
+				array(
+					'code'        => $derived['code'],
+					'locale'      => $locale,
+					'name'        => $derived['name'],
+					'native_name' => $derived['native_name'],
+					'direction'   => $derived['direction'],
+					'status'      => (string) $post['status'],
+					'sort_order'  => (int) $post['sort_order'],
+				)
+			)
+		);
+	}
+
+	/**
+	 * Custom add: the raw-field path, gated behind `aiml_allow_custom_language`.
+	 *
+	 * @param array<string, mixed> $post Sanitised submission.
+	 */
+	private function handle_custom_add( array $post ): void {
+		/**
+		 * Filters whether the "Advanced: custom language" path is available.
+		 *
+		 * @since 1.13.0
+		 *
+		 * @param bool $allowed Default true.
+		 */
+		if ( ! (bool) apply_filters( 'aiml_allow_custom_language', true ) ) {
+			wp_die( esc_html__( 'Custom languages are disabled on this site.', 'universal-multilingual' ) );
+		}
+
+		$this->redirect_with_result(
+			$this->languages->insert(
+				array(
+					'code'        => (string) $post['code'],
+					'locale'      => (string) $post['locale'],
+					'name'        => (string) $post['name'],
+					'native_name' => (string) $post['native_name'],
+					'direction'   => (string) $post['direction'],
+					'status'      => (string) $post['status'],
+					'sort_order'  => (int) $post['sort_order'],
+				)
+			)
+		);
+	}
+
+	/**
+	 * Edit: `code` and `locale` are pinned to the stored row for every language.
+	 *
+	 * @param array<string, mixed> $post Sanitised submission.
+	 */
+	private function handle_edit( array $post ): void {
+		$language_id = (int) $post['language_id'];
+
+		$row = $this->languages->find( $language_id );
+		if ( null === $row ) {
+			$this->redirect_with_result(
+				new WP_Error( 'aiml_unknown_language', __( 'That language does not exist.', 'universal-multilingual' ) )
+			);
+			return;
+		}
+
+		$stored_group = $this->registry->group_for_locale( (string) $row->locale );
+		$override     = (string) $post['native_name'];
 
 		$data = array(
-			'code'        => isset( $_POST['code'] ) ? sanitize_text_field( wp_unslash( $_POST['code'] ) ) : '',
-			'locale'      => isset( $_POST['locale'] ) ? sanitize_text_field( wp_unslash( $_POST['locale'] ) ) : '',
-			'name'        => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '',
-			'native_name' => isset( $_POST['native_name'] ) ? sanitize_text_field( wp_unslash( $_POST['native_name'] ) ) : '',
-			'direction'   => isset( $_POST['direction'] ) ? sanitize_text_field( wp_unslash( $_POST['direction'] ) ) : 'ltr',
-			'status'      => isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : Languages::STATUS_PREVIEW,
-			'sort_order'  => isset( $_POST['sort_order'] ) ? (int) $_POST['sort_order'] : 0,
+			'status'     => (string) $post['status'],
+			'sort_order' => (int) $post['sort_order'],
 		);
 
-		$result = $language_id > 0
-			? $this->languages->update( $language_id, $data )
-			: $this->languages->insert( $data );
+		if ( null !== $stored_group ) {
+			// Curated row: name and direction are re-derived from the registry;
+			// code and locale are left out of $data so update() keeps them.
+			$derived = DerivedLanguageMetadata::derive( (string) $row->locale, $stored_group, $this->existing_identities(), $language_id, $this->registry );
+			if ( is_wp_error( $derived ) ) {
+				$this->redirect_with_result( $derived );
+				return;
+			}
 
-		$this->redirect_with_result( $result );
+			$data['name']        = $derived['name'];
+			$data['direction']   = $derived['direction'];
+			$data['native_name'] = '' !== $override ? $override : $derived['native_name'];
+		} else {
+			// Custom row: name, native name and direction are editable; code and
+			// locale still stay pinned (never read from the submission).
+			if ( $post['has_name'] ) {
+				$data['name'] = (string) $post['name'];
+			}
+			if ( $post['has_direction'] ) {
+				$data['direction'] = (string) $post['direction'];
+			}
+			$data['native_name'] = $override;
+		}
+
+		$this->redirect_with_result( $this->languages->update( $language_id, $data ) );
 	}
 
 	/**
@@ -248,96 +772,7 @@ final class LanguagesScreen {
 		$this->redirect_with_result( $this->languages->delete( $language_id ) );
 	}
 
-	// -- Rendering helpers --
-
-	/**
-	 * Renders the add/edit language form.
-	 *
-	 * @param object|null $editing Language being edited, or null to add.
-	 */
-	private function render_form( ?object $editing ): void {
-		$is_edit    = null !== $editing;
-		$is_default = $is_edit && ! empty( $editing->is_default );
-
-		echo '<h2>' . esc_html( $is_edit ? __( 'Edit language', 'universal-multilingual' ) : __( 'Add a language', 'universal-multilingual' ) ) . '</h2>';
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="aiml_save_language" />';
-
-		wp_nonce_field( 'aiml_save_language' );
-
-		if ( $is_edit ) {
-			echo '<input type="hidden" name="language_id" value="' . esc_attr( (string) (int) $editing->language_id ) . '" />';
-		}
-
-		echo '<table class="form-table" role="presentation"><tbody>';
-
-		$this->text_row( 'code', __( 'URL code', 'universal-multilingual' ), $is_edit ? (string) $editing->code : '', __( 'Two lowercase letters, optionally with a region: sv, pt-br. Appears in the URL as /sv/.', 'universal-multilingual' ) );
-		$this->text_row( 'locale', __( 'Locale', 'universal-multilingual' ), $is_edit ? (string) $editing->locale : '', __( 'WordPress locale, for example sv_SE.', 'universal-multilingual' ) );
-		$this->text_row( 'name', __( 'Name', 'universal-multilingual' ), $is_edit ? (string) $editing->name : '', __( 'English name, for example Swedish.', 'universal-multilingual' ) );
-		$this->text_row( 'native_name', __( 'Native name', 'universal-multilingual' ), $is_edit ? (string) $editing->native_name : '', __( 'The language in its own words, for example Svenska.', 'universal-multilingual' ) );
-
-		// Direction.
-		echo '<tr><th scope="row"><label for="aiml-direction">' . esc_html__( 'Text direction', 'universal-multilingual' ) . '</label></th><td>';
-		echo '<select name="direction" id="aiml-direction">';
-		foreach ( Languages::DIRECTIONS as $direction ) {
-			printf(
-				'<option value="%1$s"%2$s>%1$s</option>',
-				esc_attr( $direction ),
-				selected( $is_edit ? (string) $editing->direction : 'ltr', $direction, false )
-			);
-		}
-		echo '</select></td></tr>';
-
-		// State.
-		echo '<tr><th scope="row"><label for="aiml-status">' . esc_html__( 'State', 'universal-multilingual' ) . '</label></th><td>';
-
-		if ( $is_default ) {
-			echo '<p><strong>' . esc_html__( 'Published', 'universal-multilingual' ) . '</strong><br />';
-			echo '<span class="description">' . esc_html__( 'The default language is the source content, so it is always published and always unprefixed.', 'universal-multilingual' ) . '</span></p>';
-		} else {
-			echo '<select name="status" id="aiml-status">';
-			foreach ( Languages::statuses() as $status ) {
-				printf(
-					'<option value="%1$s"%2$s>%3$s</option>',
-					esc_attr( $status ),
-					selected( $is_edit ? (string) $editing->status : Languages::STATUS_PREVIEW, $status, false ),
-					esc_html( $this->status_label( $status ) )
-				);
-			}
-			echo '</select>';
-			echo '<p class="description">' . esc_html__( 'Preview: visible only to users who can translate. Published: visible to everyone. Disabled: not routed at all. A disabled language returns through preview before it can be published again.', 'universal-multilingual' ) . '</p>';
-		}
-
-		echo '</td></tr>';
-
-		$this->text_row( 'sort_order', __( 'Sort order', 'universal-multilingual' ), $is_edit ? (string) (int) $editing->sort_order : '0', __( 'Order in the language switcher.', 'universal-multilingual' ) );
-
-		echo '</tbody></table>';
-
-		submit_button( $is_edit ? __( 'Save language', 'universal-multilingual' ) : __( 'Add language', 'universal-multilingual' ) );
-
-		echo '</form>';
-	}
-
-	/**
-	 * Renders a labelled text input row.
-	 *
-	 * @param string $name        Field name.
-	 * @param string $label       Field label.
-	 * @param string $value       Current value.
-	 * @param string $description Help text.
-	 */
-	private function text_row( string $name, string $label, string $value, string $description ): void {
-		printf(
-			'<tr><th scope="row"><label for="aiml-%1$s">%2$s</label></th><td>'
-			. '<input type="text" class="regular-text" id="aiml-%1$s" name="%1$s" value="%3$s" />'
-			. '<p class="description">%4$s</p></td></tr>',
-			esc_attr( $name ),
-			esc_html( $label ),
-			esc_attr( $value ),
-			esc_html( $description )
-		);
-	}
+	// -- Shared helpers --
 
 	/**
 	 * Maps a language status to its display label.
@@ -359,6 +794,21 @@ final class LanguagesScreen {
 	}
 
 	/**
+	 * A status pill for the list.
+	 *
+	 * @param string $status Stored status.
+	 */
+	private function status_badge( string $status ): string {
+		$variant = in_array( $status, Languages::statuses(), true ) ? $status : Languages::STATUS_PREVIEW;
+
+		return sprintf(
+			'<span class="aiml-ui-badge aiml-ui-badge--%1$s"><span class="aiml-ui-badge__dot"></span>%2$s</span>',
+			esc_attr( $variant ),
+			esc_html( $this->status_label( $status ) )
+		);
+	}
+
+	/**
 	 * Redirects back to the Languages screen carrying the outcome of a write.
 	 *
 	 * @param true|int|WP_Error $result Outcome from the languages store.
@@ -366,8 +816,9 @@ final class LanguagesScreen {
 	private function redirect_with_result( $result ): void {
 		$args = array( 'page' => SettingsPage::MENU_SLUG );
 
-		if ( $result instanceof WP_Error ) {
-			$args['aiml_error'] = rawurlencode( $result->get_error_message() );
+		if ( is_wp_error( $result ) ) {
+			$args['aiml_error']      = rawurlencode( $result->get_error_message() );
+			$args['aiml_error_code'] = $result->get_error_code();
 		} else {
 			$args['aiml_updated'] = '1';
 		}
@@ -383,7 +834,7 @@ final class LanguagesScreen {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display-only feedback.
 		if ( isset( $_GET['aiml_error'] ) ) {
 			printf(
-				'<div class="notice notice-error"><p>%s</p></div>',
+				'<div class="aiml-ui-panel aiml-ui-panel--error"><p class="aiml-ui-panel__message">%s</p></div>',
 				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 				esc_html( rawurldecode( sanitize_text_field( wp_unslash( $_GET['aiml_error'] ) ) ) )
 			);
@@ -394,7 +845,7 @@ final class LanguagesScreen {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( isset( $_GET['aiml_updated'] ) ) {
 			printf(
-				'<div class="notice notice-success"><p>%s</p></div>',
+				'<div class="aiml-ui-panel aiml-ui-panel--success"><p class="aiml-ui-panel__message">%s</p></div>',
 				esc_html__( 'Saved.', 'universal-multilingual' )
 			);
 		}

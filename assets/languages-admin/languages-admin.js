@@ -80,30 +80,6 @@
 		return strings.ltr || 'Left to right';
 	}
 
-	/**
-	 * Best-effort client preview of the URL code. The server is authoritative.
-	 */
-	function previewCode( meta, usedCodes ) {
-		if ( ! meta ) {
-			return '';
-		}
-		var lang = meta.language_code;
-		var region = meta.region || '';
-		var variant = meta.variant || '';
-
-		if ( variant && region ) {
-			return lang + '-' + region + '-' + variant;
-		}
-
-		if ( usedCodes.indexOf( lang ) === -1 ) {
-			return lang;
-		}
-		if ( region ) {
-			return lang + '-' + region;
-		}
-		return lang;
-	}
-
 	function wireDerivedUi( groupSelect ) {
 		var regionField = document.querySelector( '[data-aiml-region-field]' );
 		var regionSelect = document.getElementById( 'aiml-region-select' );
@@ -112,10 +88,6 @@
 		if ( ! data.groups || ! data.locales ) {
 			return;
 		}
-
-		var usedCodes = ( data.existing || [] ).map( function ( row ) {
-			return row.code;
-		} );
 
 		function currentLocale() {
 			var group = data.groups[ groupSelect.value ];
@@ -142,7 +114,7 @@
 			regionSelect.innerHTML = '';
 			group.locales.forEach( function ( locale ) {
 				var meta = data.locales[ locale ];
-				var used = usedCodes.length && ( data.existing || [] ).some( function ( r ) {
+				var used = ( data.existing || [] ).some( function ( r ) {
 					return r.locale === locale;
 				} );
 				var opt = document.createElement( 'option' );
@@ -168,7 +140,7 @@
 				return;
 			}
 			summary.hidden = false;
-			var code = previewCode( meta, usedCodes );
+			var code = meta.preview_code || meta.language_code;
 			summary.querySelector( '[data-aiml-summary-url]' ).textContent = '/' + code + '/';
 			summary.querySelector( '[data-aiml-summary-locale]' ).textContent = locale;
 			summary.querySelector( '[data-aiml-summary-native]' ).textContent = meta.native_name;

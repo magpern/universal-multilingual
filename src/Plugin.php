@@ -1042,6 +1042,7 @@ final class Plugin {
 			( new TranslatorWorkspace( $languages ) )->register();
 			( new GlossaryAdminPage( $languages ) )->register();
 			( new TermLocalizedSlugAdmin( $languages ) )->register();
+			( new \AIMultilingual\Admin\PromotionAdminPage( $languages ) )->register();
 
 			// Bind-mount deployments update files in place and never fire the
 			// activation hook, so schema drift has to be caught on its own.

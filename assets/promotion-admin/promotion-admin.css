@@ -1,0 +1,68 @@
+.aiml-promotion-admin .aiml-promotion-card {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 16px 20px;
+	margin: 16px 0;
+	max-width: 960px;
+}
+
+.aiml-promotion-admin .aiml-promotion-card h2 {
+	margin-top: 0;
+}
+
+.aiml-promotion-admin fieldset {
+	border: 1px solid #dcdcde;
+	padding: 8px 12px;
+	margin: 12px 0;
+}
+
+.aiml-promotion-admin .aiml-promotion-check {
+	display: inline-block;
+	margin-right: 16px;
+}
+
+.aiml-promotion-admin .aiml-promotion-cards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 12px 0;
+}
+
+.aiml-promotion-admin .aiml-promotion-count {
+	display: inline-block;
+	padding: 4px 10px;
+	border-radius: 3px;
+	background: #f0f0f1;
+	font-size: 12px;
+	color: #1d2327;
+}
+
+.aiml-promotion-admin .aiml-promotion-count--new,
+.aiml-promotion-admin .aiml-promotion-count--update {
+	background: #d5e5d5;
+}
+
+.aiml-promotion-admin .aiml-promotion-count--conflict_target_modified,
+.aiml-promotion-admin .aiml-promotion-count--conflict_both_changed,
+.aiml-promotion-admin .aiml-promotion-count--identity_conflict,
+.aiml-promotion-admin .aiml-promotion-count--ambiguous_source {
+	background: #f7d9d9;
+}
+
+.aiml-promotion-admin .aiml-promotion-count--stale_source,
+.aiml-promotion-admin .aiml-promotion-count--route_conflict,
+.aiml-promotion-admin .aiml-promotion-count--missing_language,
+.aiml-promotion-admin .aiml-promotion-count--missing_source {
+	background: #f5e6c8;
+}
+
+.aiml-promotion-admin .aiml-promotion-table {
+	margin-top: 12px;
+}
+
+.aiml-promotion-admin .aiml-promotion-summary,
+.aiml-promotion-admin .aiml-promotion-result {
+	font-weight: 600;
+	color: #3c434a;
+}

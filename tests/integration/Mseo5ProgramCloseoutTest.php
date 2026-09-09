@@ -125,9 +125,9 @@ final class Mseo5ProgramCloseoutTest extends AimlTestCase {
 	}
 
 	public function test_target_remains_eight_no_step_nine(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 		$migrator = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_9_', $migrator );
+		$this->assertStringNotContainsString( 'step_10_', $migrator );
 	}
 
 	public function test_activation_state_machine_values(): void {

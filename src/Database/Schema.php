@@ -161,7 +161,7 @@ final class Schema {
 	public static function create_languages(): string {
 		return 'CREATE TABLE IF NOT EXISTS ' . self::languages() . " (
 			language_id  SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			code         VARCHAR(12)       NOT NULL,
+			code         VARCHAR(20)       NOT NULL,
 			locale       VARCHAR(20)       NOT NULL,
 			name         VARCHAR(100)      NOT NULL,
 			native_name  VARCHAR(100)      NOT NULL DEFAULT '',
@@ -173,6 +173,7 @@ final class Schema {
 			updated_at   DATETIME          NOT NULL,
 			PRIMARY KEY (language_id),
 			UNIQUE KEY code (code),
+			UNIQUE KEY locale (locale),
 			KEY status_sort (status, sort_order)
 		) ENGINE=InnoDB ROW_FORMAT=DYNAMIC " . self::charset_collate();
 	}

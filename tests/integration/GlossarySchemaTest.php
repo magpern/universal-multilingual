@@ -25,7 +25,7 @@ final class GlossarySchemaTest extends AimlTestCase {
 
 		$this->assertSame( $table, $found );
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 		$this->assertSame( 0, (int) get_option( Schema::GLOSSARY_VERSION_OPTION, -1 ) );
 	}
 

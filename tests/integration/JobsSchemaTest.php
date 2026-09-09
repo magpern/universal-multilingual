@@ -29,7 +29,7 @@ final class JobsSchemaTest extends AimlTestCase {
 			$wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Schema::job_items() ) )
 		);
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 	}
 
 	public function test_jobs_table_columns_and_indexes(): void {

@@ -33,9 +33,14 @@ final class Migrator {
 	public const OPTION = 'aiml_db_version';
 
 	/**
+	 * Option listing locales that block the step 9 unique-index upgrade.
+	 */
+	public const BLOCKED_OPTION = 'aiml_locale_unique_blocked';
+
+	/**
 	 * Schema version this build expects.
 	 */
-	public const TARGET = 8;
+	public const TARGET = 9;
 
 	/**
 	 * Applies any migration steps newer than the recorded version.
@@ -51,7 +56,12 @@ final class Migrator {
 				continue;
 			}
 
-			$step();
+			// A step that returns false could not complete (for example step 9
+			// blocked by pre-existing duplicate data). The recorded version
+			// stays where it is; the next maybe_migrate() run retries.
+			if ( false === $step() ) {
+				break;
+			}
 
 			update_option( self::OPTION, $version, true );
 		}
@@ -78,7 +88,10 @@ final class Migrator {
 	/**
 	 * Ordered migration steps, keyed by the version they produce.
 	 *
-	 * @return array<int, callable():void>
+	 * A step returns void (or true) on success, or false when it could not
+	 * complete and the run should stop without advancing.
+	 *
+	 * @return array<int, callable():(void|bool)>
 	 */
 	private function steps(): array {
 		return array(
@@ -90,6 +103,7 @@ final class Migrator {
 			6 => array( $this, 'step_6_background_jobs' ),
 			7 => array( $this, 'step_7_publication_axis' ),
 			8 => array( $this, 'step_8_mseo_localized_url_foundation' ),
+			9 => array( $this, 'step_9_language_metadata' ),
 		);
 	}
 
@@ -291,5 +305,173 @@ final class Migrator {
 			);
 			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
+	}
+
+	/**
+	 * Step 9 — language identity integrity (ADR-0028 / ADR-0029).
+	 *
+	 * Widens `aiml_languages.code` to VARCHAR(20) for three-segment URL codes
+	 * and adds `UNIQUE KEY locale (locale)` so two languages can never share a
+	 * WordPress locale.
+	 *
+	 * The unique index cannot be created while duplicate locales exist, and the
+	 * plugin must not merge language rows on an operator's behalf. So this step
+	 * first checks for duplicates: if any are found it records them, leaves the
+	 * schema (and the recorded version) untouched, and returns false — the
+	 * admin notice from {@see render_blocked_notice()} then asks an operator to
+	 * resolve the conflict, and the next migration run retries. The ALTER is
+	 * verified against the live schema before the version is allowed to advance.
+	 *
+	 * @return bool True when the schema is at version 9; false when blocked.
+	 */
+	private function step_9_language_metadata(): bool {
+		global $wpdb;
+
+		$table         = Schema::languages();
+		$escaped_table = str_replace( '`', '``', $table );
+
+		$has_unique_locale = $this->has_unique_index( $table, 'locale' );
+		$code_is_wide      = 20 === $this->column_char_length( $table, 'code' );
+
+		if ( $has_unique_locale && $code_is_wide ) {
+			delete_option( self::BLOCKED_OPTION );
+
+			return true;
+		}
+
+		$clauses = array();
+
+		if ( ! $code_is_wide ) {
+			$clauses[] = 'MODIFY code VARCHAR(20) NOT NULL';
+		}
+
+		if ( ! $has_unique_locale ) {
+			// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- schema table identifier only.
+			$duplicates = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				"SELECT locale FROM `{$escaped_table}` GROUP BY locale HAVING COUNT(*) > 1"
+			);
+			// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			if ( ! empty( $duplicates ) ) {
+				update_option(
+					self::BLOCKED_OPTION,
+					array_values( array_map( 'strval', $duplicates ) ),
+					true
+				);
+
+				return false;
+			}
+
+			$clauses[] = 'ADD UNIQUE KEY locale (locale)';
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- schema identifiers only; clause list is a fixed literal set.
+		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"ALTER TABLE `{$escaped_table}` " . implode( ', ', $clauses )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		$verified = $this->has_unique_index( $table, 'locale' )
+			&& 20 === $this->column_char_length( $table, 'code' );
+
+		if ( ! $verified ) {
+			// The ALTER did not take. Stay at version 8 and retry next run.
+			error_log( 'AIML: migration step 9 could not verify the aiml_languages schema; staying at the previous version.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+
+			return false;
+		}
+
+		delete_option( self::BLOCKED_OPTION );
+
+		return true;
+	}
+
+	/**
+	 * Whether a UNIQUE index of the given name exists on a plugin table.
+	 *
+	 * @param string $table Fully qualified table name.
+	 * @param string $index Index name.
+	 */
+	private function has_unique_index( string $table, string $index ): bool {
+		global $wpdb;
+
+		$escaped = str_replace( '`', '``', $table );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- schema table identifier only.
+		$rows = $wpdb->get_results( "SHOW INDEX FROM `{$escaped}`" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		foreach ( (array) $rows as $row ) {
+			// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			if ( isset( $row->Key_name, $row->Non_unique )
+				&& $index === (string) $row->Key_name // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+				&& '0' === (string) $row->Non_unique ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * The declared VARCHAR length of a column, or 0 when it is not a VARCHAR.
+	 *
+	 * @param string $table  Fully qualified table name.
+	 * @param string $column Column name.
+	 */
+	private function column_char_length( string $table, string $column ): int {
+		global $wpdb;
+
+		$escaped = str_replace( '`', '``', $table );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- trusted schema table name.
+		$row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare( "SHOW COLUMNS FROM `{$escaped}` LIKE %s", $column )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( null === $row || ! isset( $row->Type ) ) { // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+			return 0;
+		}
+
+		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		if ( 1 === preg_match( '/^varchar\((\d+)\)/i', (string) $row->Type, $matches ) ) {
+			return (int) $matches[1];
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Admin notice shown while step 9 is blocked by duplicate locales.
+	 *
+	 * Registered on `admin_notices` by the plugin bootstrap. The wording is
+	 * deliberately neutral: it asks the operator to give each language a
+	 * distinct locale, not to delete anything.
+	 */
+	public static function render_blocked_notice(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$blocked = get_option( self::BLOCKED_OPTION );
+
+		if ( empty( $blocked ) || ! is_array( $blocked ) ) {
+			return;
+		}
+
+		$locales = implode( ', ', array_map( 'sanitize_text_field', $blocked ) );
+
+		printf(
+			'<div class="notice notice-warning"><p><strong>%s</strong> %s</p></div>',
+			esc_html__( 'Universal Multilingual: a database upgrade is paused.', 'universal-multilingual' ),
+			esc_html(
+				sprintf(
+					/* translators: %s: comma-separated list of shared locales. */
+					__( 'More than one language is registered with the same locale (%s). Until each language has a distinct locale, the upgrade that enforces this cannot run. Review the affected languages under Multilingual → Languages; the upgrade finishes on its own once no locale is shared.', 'universal-multilingual' ),
+					$locales
+				)
+			)
+		);
 	}
 }

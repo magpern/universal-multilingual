@@ -45,7 +45,7 @@ final class ReviewSchemaTest extends AimlTestCase {
 	}
 
 	public function test_schema_target_is_seven(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
 	}
 
@@ -143,7 +143,7 @@ final class ReviewSchemaTest extends AimlTestCase {
 		$migrator->maybe_migrate();
 
 		$this->assertSame( Migrator::TARGET, $migrator->current_version() );
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 
 		foreach ( $this->review_columns() as $column ) {
 			$this->assertTrue( Schema::column_exists( $table, $column ) );

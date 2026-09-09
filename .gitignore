@@ -19,5 +19,6 @@ tests/quality/baselines/_staging*/
 # Local Playwright packages (non-CI)
 acceptance/*/node_modules/
 acceptance/*/artifacts/
+acceptance/*/test-results/
 acceptance/*/package-lock.json
 composer.phar

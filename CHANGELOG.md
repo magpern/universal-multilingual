@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Add a language — selection instead of data entry
+
+- The Languages screen is rebuilt on the Universal Multicurrency admin design
+  system (re-prefixed and scoped; no cross-plugin CSS load, no runtime
+  dependency).
+- Adding a language is now a choice: pick a language in a searchable
+  `ComboboxControl`, pick a regional variant only when the language has more
+  than one locale, set status and sort order. A read-only summary previews the
+  URL prefix, locale, native name and direction.
+- The server derives the URL code, English name, native name and text direction
+  from a plugin-owned locale registry (206 WordPress locales in 162 groups,
+  generated offline from GlotPress locale data — no network, no language packs,
+  no `intl` dependency). Values the browser submits for those fields are
+  discarded.
+- A gated "Advanced: custom language" disclosure keeps the raw-field path for
+  locales outside the registry, behind the new `aiml_allow_custom_language`
+  filter (default on).
+- URL-code grammar extended to `language-region-variant`
+  (`^[a-z]{2,3}(-[a-z]{2}(-[a-z0-9]+)?)?$`, ADR-0029) so explicit
+  formal/orthography variants such as `de_DE_formal` route as `/de-de-formal/`.
+  Derivation is deterministic and order-independent.
+- On Edit, `locale` and `code` are immutable for every row; a curated row
+  re-derives name/direction from the registry and takes a native-name display
+  override, a custom row also allows name/direction.
+
+### Added
+
+- `aiml_languages` now has a `UNIQUE KEY locale`; two languages can never share
+  a WordPress locale.
+
+### Fixed
+
+- A mistyped locale can no longer be saved and silently fail to load
+  translations — the locale is chosen from a list.
+
+### Migration
+
+- Schema **8 → 9** (`Migrator::TARGET`): widens `aiml_languages.code` to
+  `VARCHAR(20)` and adds `UNIQUE KEY locale`. If an install already has two
+  languages sharing a locale the upgrade **pauses** (a neutral admin notice
+  asks for each language to be given a distinct locale) and completes
+  automatically once resolved. Existing language rows are otherwise untouched.
+
 ## [1.12.0] - 2026-09-08
 
 ### Added

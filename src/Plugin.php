@@ -1008,6 +1008,7 @@ final class Plugin {
 					( new Migrator() )->maybe_migrate();
 				}
 			);
+			add_action( 'admin_notices', array( Migrator::class, 'render_blocked_notice' ) );
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {

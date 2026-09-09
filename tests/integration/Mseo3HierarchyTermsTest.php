@@ -114,7 +114,7 @@ final class Mseo3HierarchyTermsTest extends AimlTestCase {
 	}
 
 	public function test_target_remains_eight(): void {
-		$this->assertSame( 8, Migrator::TARGET );
+		$this->assertSame( 9, Migrator::TARGET );
 	}
 
 	public function test_admission_not_public_until_commit(): void {

@@ -18,12 +18,25 @@ Universal Multilingual stores one canonical object per content item and applies 
 
 1. Upload the `universal-multilingual` folder to `/wp-content/plugins/`.
 2. Activate the plugin through the Plugins screen.
-3. Confirm database schema version 8 (option `aiml_db_version`).
+3. Confirm database schema version 9 (option `aiml_db_version`).
 4. Configure languages, providers, and rollout in the Universal Multilingual admin screens.
 5. Publication gate and auto-publication mode default off/manual — enable only after reviewing release notes.
 6. Localized URLs default OFF; enable only after reviewing MSEO release notes and verifying routes.
 
+== Third-party data ==
+
+The bundled language list (`src/Language/data/locales.php`) is generated offline
+from the locale data in GlotPress (https://github.com/GlotPress/GlotPress),
+GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
+GlotPress. See the file's header for the exact source revision and snapshot date.
+
 == Changelog ==
+
+= Unreleased =
+* Add a language is now selection, not data entry: pick a language (and a region where relevant); the URL code, locale, name, native name and direction are derived server-side from a bundled locale registry (offline; no language packs). A gated "Advanced: custom language" path covers unusual locales.
+* URL-code grammar extended to language-region-variant so explicit variants such as de_DE_formal route as /de-de-formal/.
+* Locale/URL code are immutable once a language exists.
+* Schema 8 -> 9: aiml_languages.code widened to VARCHAR(20) and a UNIQUE KEY on locale. If two languages already share a locale the upgrade pauses with a neutral admin notice until each has a distinct locale.
 
 = 1.12.0 =
 * Regional Preferences: logged-in preferred language on WordPress profile and WooCommerce Account details; public aiml_get/set_preferred_language API; optional composition with Universal Multicurrency. URL language remains authoritative.

@@ -125,6 +125,17 @@ dependency; WordPress admin controls are not globally restyled. Extracting a
 shared design-system package is explicitly **deferred**; reconsider when three
 or more Universal plugins are visibly drifting.
 
+The plan sketched a separate `LanguagesComponentRenderer` class mirroring
+Universal Multicurrency's `AdminComponentRenderer`. As implemented, the
+escaped-HTML component helpers (hero, card, field, summary, badge, panel,
+list, empty-state) are **private methods on `LanguagesScreen`** rather than a
+standalone class. `LanguagesScreen` has exactly one consumer of them and the
+methods are covered by the screen's own render tests; a separate class would
+add indirection without a second caller. This is a deliberate deviation from
+the sketched file layout, not a functional change — extract the class if and
+when a second screen needs the same helpers (the same trigger as the shared
+design-system package).
+
 ## Consequences
 
 - Existing `aiml_languages` rows keep working unchanged. The registry only

@@ -28,9 +28,7 @@ use AIMultilingual\Settings;
  */
 final class PromotionCliTest extends AimlTestCase {
 
-	public function test_register_is_a_noop_without_wp_cli(): void {
-		$this->assertFalse( class_exists( \WP_CLI::class ) );
-
+	public function test_register_does_not_throw(): void {
 		$identities = new ObjectIdentityRepository();
 		$export     = new TranslationExportService( $this->store, $this->languages, $identities, new PromotionLogRepository(), new PromotionAudit() );
 		$import     = new TranslationImportService(

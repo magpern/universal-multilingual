@@ -461,3 +461,6 @@ if ( ! function_exists( 'get_current_user_id' ) ) {
 		return (int) ( $GLOBALS['aiml_unit_current_user_id'] ?? 0 );
 	}
 }
+
+// Shared unit-test fixtures (not *Test.php, so not autoloaded by the runner).
+require_once __DIR__ . '/Promotion/PackageFactory.php';

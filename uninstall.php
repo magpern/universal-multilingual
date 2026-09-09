@@ -70,6 +70,7 @@ delete_option( \AIMultilingual\Database\Migrator::BLOCKED_OPTION );
 delete_option( \AIMultilingual\Cache\Cache::VERSION_OPTION );
 delete_option( \AIMultilingual\Database\Schema::GLOSSARY_VERSION_OPTION );
 delete_option( \AIMultilingual\Promotion\PromotionCapabilities::VERSION_OPTION );
+delete_option( 'aiml_site_uuid' );
 
 // 5. Plugin-owned tables (translations includes Review Workflow columns from
 // schema v5; jobs tables from schema v6 — ADR-0011).

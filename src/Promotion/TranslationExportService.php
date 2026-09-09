@@ -25,7 +25,7 @@ use WP_Term;
  *
  * Delegates all persistence: `Store` reads, `ObjectIdentityRepository` for the
  * UUID (a write, but on the source that owns the object), the log repository
- * for history. No raw `$wpdb` here.
+ * for history. No raw SQL here.
  */
 final class TranslationExportService {
 

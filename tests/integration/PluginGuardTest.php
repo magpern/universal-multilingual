@@ -95,6 +95,22 @@ final class PluginGuardTest extends AimlTestCase {
 		);
 	}
 
+	public function test_promotion_treats_the_package_as_untrusted_input(): void {
+		foreach ( $this->sources() as $path => $code ) {
+			if ( ! str_starts_with( $path, 'src/Promotion/' ) ) {
+				continue;
+			}
+
+			foreach ( array( 'unserialize(', 'maybe_unserialize(', 'eval(', 'create_function(', 'wp_insert_post(', 'wp_update_post(', 'wp_insert_term(' ) as $needle ) {
+				$this->assertStringNotContainsString(
+					$needle,
+					$code,
+					sprintf( '%s uses "%s". The promotion package is untrusted input and $wpdb / core writes belong in src/Database (ADR-0030).', $path, $needle )
+				);
+			}
+		}
+	}
+
 	public function test_no_direct_writes_to_core_content_tables(): void {
 		$allowed_reads = array(
 			'src/Routing/HierarchyChildRepository.php',

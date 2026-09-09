@@ -115,6 +115,16 @@ use AIMultilingual\Language\LanguageResolver;
 use AIMultilingual\Language\Languages;
 use AIMultilingual\Rest\GlossaryController;
 use AIMultilingual\Rest\ProviderController;
+use AIMultilingual\Rest\PromotionController;
+use AIMultilingual\Database\ObjectIdentityRepository;
+use AIMultilingual\Database\PromotionLogRepository;
+use AIMultilingual\Database\PromotionStateRepository;
+use AIMultilingual\Promotion\ObjectIdentityResolver;
+use AIMultilingual\Promotion\PromotionAudit;
+use AIMultilingual\Promotion\ReviewToken;
+use AIMultilingual\Promotion\TranslationConflictDetector;
+use AIMultilingual\Promotion\TranslationExportService;
+use AIMultilingual\Promotion\TranslationImportService;
 use AIMultilingual\Rest\ViewModel\ReviewQueueItemSerializer;
 use AIMultilingual\Rest\ViewModel\WorkspacePageSummarySerializer;
 use AIMultilingual\Rest\ViewModel\WorkspaceSegmentSerializer;
@@ -979,6 +989,34 @@ final class Plugin {
 		// DEV → PROD translation promotion (ADR-0030). The capability-widening
 		// filter must be available to REST, CLI and admin alike.
 		( new PromotionCapabilities() )->register();
+
+		$promotion_identities = new ObjectIdentityRepository();
+		$promotion_log        = new PromotionLogRepository(
+			(int) ( $settings->get()['promotion_log_retention'] ?? PromotionLogRepository::DEFAULT_RETENTION )
+		);
+		$promotion_audit      = new PromotionAudit();
+		$promotion_export     = new TranslationExportService(
+			$store,
+			$languages,
+			$promotion_identities,
+			$promotion_log,
+			$promotion_audit
+		);
+		$promotion_import     = new TranslationImportService(
+			$store,
+			$languages,
+			new ObjectIdentityResolver( $promotion_identities ),
+			new PromotionStateRepository(),
+			$promotion_identities,
+			$promotion_log,
+			$promotion_audit,
+			$settings,
+			new TranslationConflictDetector(),
+			new ReviewToken(),
+			$review,
+			$publication
+		);
+		( new PromotionController( $promotion_export, $promotion_import, $promotion_log ) )->register();
 
 		// Stale invalidation is owned by RequestLocalInvalidationCoordinator
 		// (save_post + Rank Math meta mark dirty; shutdown flush). Do not sync here.

@@ -385,7 +385,34 @@ final class JobsController {
 			return $this->map_domain_error( $result );
 		}
 
+		$this->maybe_autostart_job( $body, $result );
+
 		return $this->respond( $this->serializer->job_array_with_operations( $result ), 201 );
+	}
+
+	/**
+	 * Enqueue a worker wake for a freshly created job when the caller asked for
+	 * it (user-facing "Translate with AI" actions only — ADR-0031 §4). Best
+	 * effort: a scheduler outage leaves the job queued and the existing health
+	 * banner explains why; the create response is never failed for this.
+	 *
+	 * @param array<string, mixed> $body   Request body.
+	 * @param object               $result Created job row.
+	 */
+	private function maybe_autostart_job( array $body, object $result ): void {
+		if ( empty( $body['autostart'] ) ) {
+			return;
+		}
+
+		if ( JobStatuses::QUEUED !== (string) ( $result->status ?? '' ) ) {
+			return;
+		}
+
+		if ( empty( $this->scheduler->health()['available'] ) ) {
+			return;
+		}
+
+		$this->scheduler->enqueue_job( (int) $result->job_id );
 	}
 
 	/**
@@ -683,6 +710,10 @@ final class JobsController {
 		$result = $this->batches->create_bulk( $scope_posts, $language_id, $shared );
 		if ( is_wp_error( $result ) ) {
 			return $this->map_domain_error( $result );
+		}
+
+		if ( ! empty( $body['autostart'] ) && ! empty( $this->scheduler->health()['available'] ) ) {
+			$this->batches->run_batch( (string) $result['batch_id'] );
 		}
 
 		return $this->respond(

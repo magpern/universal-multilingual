@@ -31,7 +31,7 @@ final class TranslatorWorkspace {
 	 * capability the user already holds; never granted as a real role
 	 * capability so it cannot drift from the two source capabilities.
 	 */
-	private const ACCESS_CAP = 'aiml_workspace_access';
+	public const ACCESS_CAP = 'aiml_workspace_access';
 
 	/**
 	 * Language registry.

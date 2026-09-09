@@ -96,6 +96,8 @@ export async function createSiteTranslateJobs( payload: {
 	clientToken?: string;
 	batchId?: string;
 	providerId?: string;
+	jobType?: string;
+	autostart?: boolean;
 } ): Promise< SiteTranslateCreateJobsResponse > {
 	try {
 		return await apiFetch< SiteTranslateCreateJobsResponse >( {
@@ -107,6 +109,8 @@ export async function createSiteTranslateJobs( payload: {
 				client_token: payload.clientToken,
 				batch_id: payload.batchId,
 				provider_id: payload.providerId,
+				job_type: payload.jobType,
+				autostart: payload.autostart,
 			},
 		} );
 	} catch ( error ) {

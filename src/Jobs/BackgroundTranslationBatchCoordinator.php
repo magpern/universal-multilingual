@@ -127,12 +127,22 @@ final class BackgroundTranslationBatchCoordinator {
 		$created  = array();
 		$failed   = array();
 
+		// A bulk selection may run any of the three AIT1 modes; default stays
+		// bulk_translate (missing-only). translate_selected is never a bulk type
+		// (it needs explicit per-post segment keys).
+		$requested_type = (string) ( $shared_args['job_type'] ?? '' );
+		$job_type       = in_array(
+			$requested_type,
+			array( JobTypes::BULK_TRANSLATE, JobTypes::RETRANSLATE_STALE, JobTypes::RETRANSLATE_MACHINE ),
+			true
+		) ? $requested_type : JobTypes::BULK_TRANSLATE;
+
 		foreach ( $posts as $post_args ) {
 			$args = array_merge(
 				$shared_args,
 				(array) $post_args,
 				array(
-					'job_type'    => JobTypes::BULK_TRANSLATE,
+					'job_type'    => $job_type,
 					'language_id' => (int) ( $post_args['language_id'] ?? $language_id ),
 					'batch_id'    => $batch_id,
 				)

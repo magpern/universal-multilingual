@@ -181,6 +181,34 @@ if ( ! function_exists( '__' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html__' ) ) {
+	/**
+	 * @param string $text   Text.
+	 * @param string $domain Text domain.
+	 */
+	function esc_html__( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		return htmlspecialchars( (string) $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_url' ) ) {
+	/**
+	 * @param string $url Raw URL.
+	 */
+	function esc_url( $url ) {
+		return str_replace( array( '"', "'", '<', '>', ' ' ), array( '%22', '%27', '%3C', '%3E', '%20' ), (string) $url );
+	}
+}
+
+if ( ! function_exists( 'esc_attr' ) ) {
+	/**
+	 * @param string $text Text.
+	 */
+	function esc_attr( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES );
+	}
+}
+
 if ( ! isset( $GLOBALS['aiml_unit_filters'] ) ) {
 	$GLOBALS['aiml_unit_filters'] = array();
 }

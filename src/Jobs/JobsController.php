@@ -797,6 +797,10 @@ final class JobsController {
 			}
 		}
 
+		if ( isset( $body['job_type'] ) && '' !== (string) $body['job_type'] ) {
+			$args['job_type'] = sanitize_key( (string) $body['job_type'] );
+		}
+
 		foreach ( array( 'budget_max_requests', 'budget_max_tokens', 'budget_warning_pct', 'glossary_version_intended' ) as $optional_int ) {
 			if ( isset( $body[ $optional_int ] ) ) {
 				$args[ $optional_int ] = (int) $body[ $optional_int ];

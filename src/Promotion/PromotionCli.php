@@ -54,7 +54,7 @@ final class PromotionCli {
 		\AIMultilingual\Database\PromotionLogRepository $log,
 		\AIMultilingual\Database\ObjectIdentityRepository $identities
 	): void {
-		if ( ! class_exists( WP_CLI::class ) ) {
+		if ( ! class_exists( WP_CLI::class ) || ! method_exists( WP_CLI::class, 'add_command' ) ) {
 			return;
 		}
 

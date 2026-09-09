@@ -26,6 +26,11 @@ final class PromotionRestTest extends AimlTestCase {
 		parent::setUp();
 
 		Plugin::activate();
+		// Neutralise cross-test role/version state so the capability matrix is
+		// deterministic regardless of suite order.
+		PromotionCapabilities::revoke_all_roles();
+		delete_option( PromotionCapabilities::VERSION_OPTION );
+		PromotionCapabilities::provision();
 		do_action( 'rest_api_init' );
 
 		$sv            = $this->add_language( 'sv', 'sv_SE' );

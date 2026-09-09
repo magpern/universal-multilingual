@@ -3,7 +3,7 @@
  * Plugin Name: Universal Multilingual
  * Plugin URI: https://github.com/magpern/universal-multilingual
  * Description: Multilingual layer for WordPress and WooCommerce. One canonical object per content item; translations are stored as stable segments and applied as presentation overlays at render time.
- * Version: 1.13.0
+ * Version: 1.14.0
  * Author: magpern
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -20,7 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AIML_VERSION', '1.13.0' );
+define( 'AIML_VERSION', '1.14.0' );
 define( 'AIML_PLUGIN_FILE', __FILE__ );
 
 // PHP version guard. The "Requires PHP" header stops activation on WP 5.1+,

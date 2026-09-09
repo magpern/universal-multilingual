@@ -25,8 +25,11 @@ final class PromotionCapabilityUpgradeTest extends AimlTestCase {
 	}
 
 	protected function tearDown(): void {
-		// Leave the suite as bootstrap left it.
-		PromotionCapabilities::provision();
+		// Leave the suite as bootstrap left it — force a grant even when a test
+		// left aiml_caps_version at the target (which would make provision() skip).
+		delete_option( PromotionCapabilities::VERSION_OPTION );
+		PromotionCapabilities::grant_default_roles();
+		update_option( PromotionCapabilities::VERSION_OPTION, PromotionCapabilities::CAPS_TARGET, true );
 		parent::tearDown();
 	}
 

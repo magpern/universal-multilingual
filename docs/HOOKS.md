@@ -97,6 +97,22 @@ reachable while logged out.
 |---|---|---|
 | `aiml_switcher_in_menu` | `false` | Whether to append the language switcher to a given nav menu. Receives the `wp_nav_menu()` args. |
 | `aiml_allow_custom_language` | `true` | Whether the "Advanced: custom language" raw-field path on the Languages screen is available. When `false`, the disclosure is hidden and a custom-language POST is refused. |
+| `aiml_promotion_can_promote` | `false` | ADR-0030. Return `true` to grant a user `aiml_promote_translations` regardless of role. Receives `($allowed, $user_id, $args)`; evaluated on every permission check so a role that gains the capability later is honoured immediately. |
+
+## DEV → PROD translation promotion — `src/Promotion/` (ADR-0030)
+
+`do_action( 'aiml_promotion_audit', array $event )` fires on export and import
+apply milestones with a content-free, secret-free payload:
+
+- `stage` — `export` | `apply_start` | `apply_row` | `apply_complete`. There is
+  **no** `validate` / `dry_run` stage: a read-only dry-run emits nothing.
+- `direction` — `export` | `import`.
+- `package_id`, `actor_id`, and stage-specific fields (`mode`, `counts`,
+  `category`, `object_uuid`; a force overwrite's `apply_row` carries the
+  discarded local `translation_hash`).
+
+History is also written to the bounded `aiml_promotion_log` table and read back
+through `GET aiml/v1/promotion/history`.
 
 ## Translator workspace REST — `src/Rest/WorkspaceController.php`
 

@@ -1096,6 +1096,7 @@ final class Plugin {
 			ExtensionCli::register( $extension_registrar, $extension_diagnostics );
 			RolloutCli::register();
 			JobsCli::register( $job_service, $job_batches, $job_scheduler, $job_worker, $job_leases, $job_concurrency );
+			\AIMultilingual\Promotion\PromotionCli::register( $promotion_export, $promotion_import, $promotion_log, $promotion_identities );
 		}
 	}
 

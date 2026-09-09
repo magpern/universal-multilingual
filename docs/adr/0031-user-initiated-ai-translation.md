@@ -89,9 +89,13 @@ Scheduler (ADR-0011 §"no wake in J2"). The Jobs REST create and the Site Transl
 batch create accept `autostart: true`, sent only by the new user-facing actions.
 When set and `scheduler->health()['available']`, the controller enqueues the job
 (or runs the batch) in the same request. CLI, the raw "Create job" dialog, and
-any REST caller that does not pass the flag keep create-then-run. If Action
-Scheduler is unavailable the job is still created and the existing health message
-is surfaced — the UI never claims it started.
+any REST caller that does not pass the flag keep create-then-run.
+
+Action Scheduler unavailability is handled by the existing `create_job` contract
+(ADR-0011 §10): job creation is rejected with `action_scheduler_unavailable` and
+no job is written. The CTA surfaces that health error and the existing
+`JobsHealthBanner`; it never claims translation started. Autostart only ever adds
+an enqueue after a successful create.
 
 ### 5. Automatic idempotency for user-facing actions
 

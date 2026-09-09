@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.12.0
+Stable tag: 1.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Multilingual layer for WordPress: canonical content with segment translations ap
 
 == Description ==
 
-Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
+Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
 
 == Installation ==
 
@@ -32,7 +32,7 @@ GlotPress. See the file's header for the exact source revision and snapshot date
 
 == Changelog ==
 
-= Unreleased =
+= 1.13.0 =
 * Add a language is now selection, not data entry: pick a language (and a region where relevant); the URL code, locale, name, native name and direction are derived server-side from a bundled locale registry (offline; no language packs). A gated "Advanced: custom language" path covers unusual locales.
 * URL-code grammar extended to language-region-variant so explicit variants such as de_DE_formal route as /de-de-formal/.
 * Locale/URL code are immutable once a language exists.

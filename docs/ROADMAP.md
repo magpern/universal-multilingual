@@ -1,13 +1,13 @@
 # Roadmap
 
-**Post-v1.12.0 milestone:** **Language admin redesign** — selection-based "Add a
+**Released in v1.13.0:** **Language admin redesign** — selection-based "Add a
 language", plugin-owned offline locale registry, extended URL-code grammar,
 `UNIQUE KEY locale` (schema **8 → 9**). Plan +
 [validation log](plans/LANGUAGE_ADMIN_REDESIGN_VALIDATION_LOG.md);
 [ADR-0028](adr/0028-curated-locale-registry-and-language-admin.md) /
-[ADR-0029](adr/0029-extended-language-url-code-grammar.md). **IMPLEMENTED on
-`feature/language-admin-redesign`** — awaiting milestone acceptance; no release,
-no deployment.
+[ADR-0029](adr/0029-extended-language-url-code-grammar.md). Merged in PR #63;
+Playwright acceptance executed on DEV (30/30). Production deployment separately
+authorized.
 
 **Long-term product planning (canonical):** [POST_V1_PLATFORM_ROADMAP.md](plans/POST_V1_PLATFORM_ROADMAP.md) — Roadmap **v1.0** (frozen). Do not duplicate strategic planning in this file.
 

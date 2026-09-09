@@ -326,4 +326,171 @@ final class RoutingTest extends AimlTestCase {
 
 		set_current_screen( 'front' );
 	}
+
+	/**
+	 * Issue #64: a bare non-default language home must not enter a
+	 * `redirect_canonical()` self-loop.
+	 *
+	 * `resolve()` rewrites `REQUEST_URI` to the unprefixed path, so core's own
+	 * `$redirect_url !== $requested_url` guard compares against `/` and never
+	 * sees that the front-page canonical target — `home_url( '/' )`, which the
+	 * `home_url` filter turns back into `/sv/` — is the very URL the visitor
+	 * requested. `filter_redirect_canonical()` has to suppress it.
+	 *
+	 * @dataProvider language_home_provider
+	 *
+	 * @param string $code   URL code.
+	 * @param string $locale WordPress locale.
+	 */
+	public function test_language_home_does_not_self_redirect( string $code, string $locale ): void {
+		$this->add_language( $code, $locale );
+
+		$router = $this->route( '/' . $code . '/' );
+		$router->enable_url_prefixing(); // The parse_request hook in production.
+
+		$canonical = home_url( '/' );
+		$this->assertStringContainsString( '/' . $code . '/', $canonical, 'sanity: home_url is prefixed' );
+
+		$this->assertFalse(
+			$router->filter_redirect_canonical( $canonical ),
+			'A canonical redirect straight back to the same language home is a loop.'
+		);
+	}
+
+	/**
+	 * Data for {@see self::test_language_home_does_not_self_redirect()}.
+	 *
+	 * @return array<string, array{0: string, 1: string}>
+	 */
+	public function language_home_provider(): array {
+		return array(
+			'simple two-letter'  => array( 'sv', 'sv_SE' ),
+			'another two-letter' => array( 'de', 'de_DE' ),
+			'three-segment code' => array( 'de-de-formal', 'de_DE_formal' ),
+		);
+	}
+
+	/**
+	 * The default (unprefixed) home is untouched — the routing filter is not
+	 * even attached for it.
+	 */
+	public function test_default_language_home_canonical_is_unchanged(): void {
+		$this->add_language();
+
+		$router = $this->route( '/' );
+
+		$this->assertSame(
+			'https://example.org/somewhere/',
+			$router->filter_redirect_canonical( 'https://example.org/somewhere/' )
+		);
+	}
+
+	/**
+	 * `/sv` (no trailing slash) → `/sv/` is a real canonicalisation to a
+	 * different URL and must still be issued.
+	 */
+	public function test_language_home_still_redirects_to_add_a_trailing_slash(): void {
+		$this->add_language();
+
+		$router = $this->route( '/sv' );
+		$router->enable_url_prefixing();
+
+		$target = home_url( '/' ); // http://example.org/sv/ once filtered.
+
+		$this->assertSame(
+			$target,
+			$router->filter_redirect_canonical( $target ),
+			'/sv must still be allowed to redirect to /sv/.'
+		);
+	}
+
+	/**
+	 * An in-language canonical redirect to a genuinely different path (adding a
+	 * trailing slash to an inner route) is preserved.
+	 */
+	public function test_in_language_trailing_slash_redirect_is_preserved(): void {
+		$this->add_language();
+		$post = $this->create_page( 'About Us' );
+
+		$router = $this->route( '/sv/' . $post->post_name ); // No trailing slash.
+		$router->enable_url_prefixing();
+
+		$target = home_url( '/' . $post->post_name . '/' ); // http://example.org/sv/about-us/ once filtered.
+
+		$this->assertSame(
+			$target,
+			$router->filter_redirect_canonical( $target ),
+			'An in-language redirect to a different URL must still fire.'
+		);
+	}
+
+	/**
+	 * Core trying to "correct" a prefixed URL back to the unprefixed one stays
+	 * blocked (ADR-SEOb) — the self-loop guard does not change this.
+	 */
+	public function test_language_strip_canonical_is_still_blocked(): void {
+		$this->add_language();
+
+		$router = $this->route( '/sv/' );
+
+		$this->assertFalse(
+			$router->filter_redirect_canonical( 'https://example.org/some-inner-page/' )
+		);
+	}
+
+	/**
+	 * An unknown prefixed inner path still 404s with no canonical loop.
+	 */
+	public function test_unknown_prefixed_inner_path_404s_without_a_loop(): void {
+		$this->add_language();
+
+		$router = $this->route( '/sv/no-such-thing/' );
+		$this->go_to( $_SERVER['REQUEST_URI'] );
+		$this->assertTrue( is_404() );
+
+		$router->enable_url_prefixing();
+		$this->assertFalse(
+			$router->filter_redirect_canonical( home_url( '/no-such-thing/' ) ),
+			'A canonical redirect back to the same 404 URL would loop.'
+		);
+	}
+
+	/**
+	 * A genuine scheme upgrade (http → https) for the language home is a
+	 * different URL, not a self-loop, and must still redirect.
+	 */
+	public function test_scheme_upgrade_on_the_language_home_is_not_a_self_loop(): void {
+		$this->add_language();
+
+		$router = $this->route( '/sv/' );
+		$router->enable_url_prefixing();
+
+		$target = set_url_scheme( home_url( '/' ), 'https' ); // https://example.org/sv/ — a real upgrade.
+
+		$this->assertSame(
+			$target,
+			$router->filter_redirect_canonical( $target ),
+			'A scheme upgrade must not be suppressed as a self-redirect.'
+		);
+	}
+
+	/**
+	 * The self-loop guard reads only the request path — no cookie, header or
+	 * other visitor state (ADR-0024).
+	 */
+	public function test_self_loop_guard_ignores_visitor_state(): void {
+		$this->add_language();
+
+		$router = $this->route( '/sv/' );
+		$router->enable_url_prefixing();
+
+		$_COOKIE['aiml_lang']            = 'en';
+		$_SERVER['HTTP_ACCEPT_LANGUAGE'] = 'en-US,en;q=0.9';
+
+		try {
+			$this->assertFalse( $router->filter_redirect_canonical( home_url( '/' ) ) );
+		} finally {
+			unset( $_COOKIE['aiml_lang'], $_SERVER['HTTP_ACCEPT_LANGUAGE'] );
+		}
+	}
 }

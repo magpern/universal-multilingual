@@ -32,6 +32,9 @@ GlotPress. See the file's header for the exact source revision and snapshot date
 
 == Changelog ==
 
+= Unreleased =
+* Fixed a redirect_canonical() self-loop on bare non-default language home URLs (/sv/, /de/, /de-de-formal/). Legitimate canonicalisation such as /sv -> /sv/ is unaffected. (#64)
+
 = 1.13.0 =
 * Add a language is now selection, not data entry: pick a language (and a region where relevant); the URL code, locale, name, native name and direction are derived server-side from a bundled locale registry (offline; no language packs). A gated "Advanced: custom language" path covers unusual locales.
 * URL-code grammar extended to language-region-variant so explicit variants such as de_DE_formal route as /de-de-formal/.

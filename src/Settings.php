@@ -34,7 +34,7 @@ final class Settings {
 	/**
 	 * Shape version of the settings array (not the database schema version).
 	 */
-	public const SCHEMA_VERSION = 2;
+	public const SCHEMA_VERSION = 3;
 
 	/**
 	 * Lazily loaded, sanitized settings.
@@ -178,6 +178,14 @@ final class Settings {
 			'localized_urls_admitted_capabilities'     => array(),
 			'localized_urls_capability_checkpoint'     => null,
 			'localized_urls_woo_product_fingerprint'   => '',
+
+			/*
+			 * ADR-0030: DEV → PROD translation promotion operational limits.
+			 * Bytes is the hard decoded-package ceiling; retention bounds the
+			 * aiml_promotion_log sweep.
+			 */
+			'promotion_max_package_bytes'              => 26214400,
+			'promotion_log_retention'                  => 200,
 		);
 	}
 
@@ -286,6 +294,16 @@ final class Settings {
 		if ( array_key_exists( 'localized_urls_woo_product_fingerprint', $raw ) ) {
 			$fp = strtolower( preg_replace( '/[^a-f0-9]/', '', (string) $raw['localized_urls_woo_product_fingerprint'] ) ?? '' );
 			$clean['localized_urls_woo_product_fingerprint'] = substr( $fp, 0, 64 );
+		}
+
+		if ( array_key_exists( 'promotion_max_package_bytes', $raw ) ) {
+			// Clamp to [1 MB, 25 MB]; the architecture freezes 25 MB as the ceiling.
+			$bytes                                = (int) $raw['promotion_max_package_bytes'];
+			$clean['promotion_max_package_bytes'] = max( 1048576, min( 26214400, $bytes ) );
+		}
+
+		if ( array_key_exists( 'promotion_log_retention', $raw ) ) {
+			$clean['promotion_log_retention'] = max( 20, min( 5000, (int) $raw['promotion_log_retention'] ) );
 		}
 
 		if ( array_key_exists( 'ai_model', $raw ) ) {

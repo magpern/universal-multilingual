@@ -33,6 +33,9 @@ final class Schema {
 	public const SLUG_ROUTES           = 'aiml_slug_routes';
 	public const ROUTE_HISTORY         = 'aiml_route_history';
 	public const SLUG_REINDEX_FRONTIER = 'aiml_slug_reindex_frontier';
+	public const OBJECT_IDENTITY       = 'aiml_object_identity';
+	public const PROMOTION_STATE       = 'aiml_promotion_state';
+	public const PROMOTION_LOG         = 'aiml_promotion_log';
 
 	/**
 	 * Option holding the monotonic glossary lexicon version (ADR-0014).
@@ -121,12 +124,36 @@ final class Schema {
 	}
 
 	/**
+	 * Fully qualified `aiml_object_identity` table name.
+	 */
+	public static function object_identity(): string {
+		return self::table( self::OBJECT_IDENTITY );
+	}
+
+	/**
+	 * Fully qualified `aiml_promotion_state` table name.
+	 */
+	public static function promotion_state(): string {
+		return self::table( self::PROMOTION_STATE );
+	}
+
+	/**
+	 * Fully qualified `aiml_promotion_log` table name.
+	 */
+	public static function promotion_log(): string {
+		return self::table( self::PROMOTION_LOG );
+	}
+
+	/**
 	 * Every table this plugin owns, in drop-safe order.
 	 *
 	 * @return string[]
 	 */
 	public static function all_tables(): array {
 		return array(
+			self::promotion_log(),
+			self::promotion_state(),
+			self::object_identity(),
 			self::job_items(),
 			self::jobs(),
 			self::slug_reindex_frontier(),
@@ -539,6 +566,90 @@ final class Schema {
 			PRIMARY KEY (frontier_id),
 			UNIQUE KEY parent_frontier (parent_source_type, parent_source_id),
 			KEY status_updated (status, updated_at)
+		) ENGINE=InnoDB ROW_FORMAT=DYNAMIC " . self::charset_collate();
+	}
+
+	/**
+	 * DDL for the cross-environment object identity map (ADR-0030).
+	 *
+	 * One row per translatable source object. `uuid` is minted once on the
+	 * source and travels in every promotion package; `natural_key` is a
+	 * deterministic, environment-independent string used only to bootstrap the
+	 * first match, indexed through its sha256 (`natural_key_hash`) because the
+	 * full key can exceed 255 chars for deep hierarchies. This table only ever
+	 * records identity — it never creates a WordPress object (invariant 1) and
+	 * its writes stay inside `src/Database/*` (invariant 8).
+	 */
+	public static function create_object_identity(): string {
+		return 'CREATE TABLE IF NOT EXISTS ' . self::object_identity() . " (
+			identity_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			source_type       VARCHAR(20)     NOT NULL,
+			source_id         BIGINT UNSIGNED NOT NULL,
+			source_subtype    VARCHAR(64)     NOT NULL DEFAULT '',
+			uuid              CHAR(36)        NOT NULL,
+			natural_key       TEXT            NOT NULL,
+			natural_key_hash  BINARY(32)      NOT NULL,
+			natural_key_parts LONGTEXT        NULL,
+			first_seen_at     DATETIME        NOT NULL,
+			updated_at        DATETIME        NOT NULL,
+			PRIMARY KEY (identity_id),
+			UNIQUE KEY object_identity (source_type, source_id),
+			UNIQUE KEY uuid (uuid),
+			KEY natural_lookup (source_type, natural_key_hash)
+		) ENGINE=InnoDB ROW_FORMAT=DYNAMIC " . self::charset_collate();
+	}
+
+	/**
+	 * DDL for the three-way promotion merge baseline (ADR-0030).
+	 *
+	 * Written only by import apply. Records, per promoted segment, what was last
+	 * successfully written into it so a later import can tell an ordinary update
+	 * from a translation edited independently on this environment. Keyed by
+	 * cross-environment identity (`object_uuid` + `language_code` + `segment_hash`)
+	 * so it survives local numeric-ID churn.
+	 */
+	public static function create_promotion_state(): string {
+		return 'CREATE TABLE IF NOT EXISTS ' . self::promotion_state() . " (
+			state_id                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			object_uuid                    CHAR(36)        NOT NULL,
+			language_code                  VARCHAR(20)     NOT NULL,
+			segment_hash                   CHAR(40)        NOT NULL,
+			last_promoted_translation_hash CHAR(40)        NOT NULL,
+			last_promoted_source_hash      CHAR(40)        NOT NULL,
+			last_package_id                CHAR(36)        NOT NULL,
+			direction                      VARCHAR(8)      NOT NULL DEFAULT 'import',
+			last_promoted_at               DATETIME        NOT NULL,
+			PRIMARY KEY (state_id),
+			UNIQUE KEY promoted_identity (object_uuid, language_code, segment_hash),
+			KEY package_lookup (last_package_id)
+		) ENGINE=InnoDB ROW_FORMAT=DYNAMIC " . self::charset_collate();
+	}
+
+	/**
+	 * DDL for the promotion audit log (ADR-0030).
+	 *
+	 * Infrequent, high-consequence, operator-facing history. Written only by
+	 * export and by import apply — never by a read-only dry-run. Bounded by a
+	 * retention sweep on write.
+	 */
+	public static function create_promotion_log(): string {
+		return 'CREATE TABLE IF NOT EXISTS ' . self::promotion_log() . " (
+			promotion_id     BIGINT UNSIGNED   NOT NULL AUTO_INCREMENT,
+			direction        VARCHAR(8)        NOT NULL,
+			package_id       CHAR(36)          NOT NULL,
+			package_checksum CHAR(64)          NOT NULL DEFAULT '',
+			format_version   SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+			mode             VARCHAR(16)       NOT NULL DEFAULT '',
+			language_codes   VARCHAR(255)      NOT NULL DEFAULT '',
+			counts_json      LONGTEXT          NULL,
+			result           VARCHAR(16)       NOT NULL DEFAULT '',
+			actor_id         BIGINT UNSIGNED   NOT NULL DEFAULT 0,
+			source_site_uuid CHAR(36)          NOT NULL DEFAULT '',
+			created_at       DATETIME          NOT NULL,
+			finished_at      DATETIME          NULL,
+			PRIMARY KEY (promotion_id),
+			KEY direction_created (direction, created_at),
+			KEY package_id (package_id)
 		) ENGINE=InnoDB ROW_FORMAT=DYNAMIC " . self::charset_collate();
 	}
 }

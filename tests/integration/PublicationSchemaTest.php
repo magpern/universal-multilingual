@@ -41,7 +41,7 @@ final class PublicationSchemaTest extends AimlTestCase {
 	}
 
 	public function test_schema_target_is_seven(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
 	}
 
@@ -218,7 +218,7 @@ final class PublicationSchemaTest extends AimlTestCase {
 		$migrator->maybe_migrate();
 
 		$this->assertSame( Migrator::TARGET, $migrator->current_version() );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		foreach ( $this->publication_columns() as $column ) {
 			$this->assertTrue( Schema::column_exists( $table, $column ) );

@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-09-09
+
+### Added
+
+#### DEV → PROD translation promotion (ADR-0030)
+
+- A first-class **Translation Promotion** module: export reviewed translations
+  from one environment as a versioned `.json` package, import it on another with
+  a strictly read-only dry-run, review the classification, then explicitly
+  apply. Idempotent and safe to re-run.
+- **Cross-environment identity**: new `aiml_object_identity` table holding a
+  plugin-owned UUID plus a deterministic, environment-independent natural key
+  (canonical slug + type + ancestor chain, stored as TEXT, indexed by sha256).
+  Export mints the UUID before serialization; the far side bootstraps by
+  natural key on the first promotion and is UUID-joined and rename-proof
+  afterwards. `identity_conflict` / `ambiguous_source` fail closed.
+- **Three-way merge baseline**: new `aiml_promotion_state` table records, per
+  promoted segment, the last-promoted translation and source hash so an import
+  distinguishes an ordinary update from a translation edited independently on
+  the target.
+- **Package format v1**: manifest / deterministic payload split, dual checksums
+  (`payload_checksum` for content identity, `package_checksum` over
+  `{manifest, payload}` for whole-artifact integrity). `format_version == 1`
+  only. Size ceiling 25 MB, 3,000 objects.
+- **Dry-run** classifies every segment (new / update / unchanged /
+  conflict_target_modified / conflict_both_changed / stale_source /
+  missing_source / missing_language / unsupported_type / unknown_field /
+  route_conflict / identity_conflict / ambiguous_source / validation_failure)
+  and returns a **stateless signed review token**; it performs no writes and
+  emits no action hooks.
+- **Apply** re-uploads the package, verifies the token and re-plans; any
+  material drift since the reviewed dry-run refuses the whole apply. A narrow
+  write-time change makes just that row `changed_since_dry_run`. Modes:
+  `safe_only` (new + update), `selective` (per-row allowlist + explicit
+  stale/conflict/route acknowledgement), `force`. Writes go through
+  `Store::save_translation()` / `save_slug_candidate()` only. Route rows stay a
+  per-environment projection — only the slug candidate is imported.
+- **Conservative language mapping**: exact locale, then a bare-code fallback
+  only when a locale is unspecified and unique; two explicit locales are never
+  cross-mapped; a language is never auto-created.
+- **Capabilities**: `aiml_promote_translations` and
+  `aiml_trust_promoted_review_state` (both `administrator` only by default,
+  provisioned through the versioned `aiml_caps_version` option on activation and
+  `admin_init`), widenable per-site via the `aiml_promotion_can_promote` filter.
+- REST API under `aiml/v1/promotion/{export,import/validate,import/apply,history}`,
+  admin screen under Universal Multilingual, and `wp aiml promotion
+  {export,import,history,backfill-identity}` CLI — all sharing one domain
+  service layer.
+- New `do_action( 'aiml_promotion_audit' )` channel (`export` / `apply_*`
+  stages only). New `aiml_promotion_log` history table.
+
+### Changed
+
+- `Migrator::TARGET` 9 → 10 (`step_10_promotion_foundation` creates the three
+  promotion tables; no `aiml_translations` column).
+- `Settings::SCHEMA_VERSION` 2 → 3 adds `promotion_max_package_bytes` and
+  `promotion_log_retention`.
+
 ## [1.13.0] - 2026-09-09
 
 ### Changed

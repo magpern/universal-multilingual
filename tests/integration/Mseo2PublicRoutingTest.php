@@ -151,7 +151,7 @@ final class Mseo2PublicRoutingTest extends AimlTestCase {
 	}
 
 	public function test_migrator_target_stays_eight(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 	}
 
 	public function test_current_localized_on_serves_without_redirect(): void {

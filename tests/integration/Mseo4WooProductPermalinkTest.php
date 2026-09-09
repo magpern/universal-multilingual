@@ -39,7 +39,7 @@ final class Mseo4WooProductPermalinkTest extends AimlTestCase {
 	}
 
 	public function test_target_remains_eight(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 	}
 
 	public function test_capability_epoch_is_two(): void {

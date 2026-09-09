@@ -43,6 +43,8 @@ required = {
     "universal-multilingual/assets/block-editor.js",
     "universal-multilingual/assets/glossary-admin/glossary-admin.js",
     "universal-multilingual/assets/term-slug-admin/term-slug-admin.js",
+    "universal-multilingual/assets/promotion-admin/promotion-admin.js",
+    "universal-multilingual/assets/promotion-admin/promotion-admin.css",
     "universal-multilingual/assets/translator-workspace/build/index.js",
     "universal-multilingual/assets/translator-workspace/build/index.asset.php",
     "universal-multilingual/assets/frontend/floating-selector.css",

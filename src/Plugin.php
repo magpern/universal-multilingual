@@ -115,6 +115,16 @@ use AIMultilingual\Language\LanguageResolver;
 use AIMultilingual\Language\Languages;
 use AIMultilingual\Rest\GlossaryController;
 use AIMultilingual\Rest\ProviderController;
+use AIMultilingual\Rest\PromotionController;
+use AIMultilingual\Database\ObjectIdentityRepository;
+use AIMultilingual\Database\PromotionLogRepository;
+use AIMultilingual\Database\PromotionStateRepository;
+use AIMultilingual\Promotion\ObjectIdentityResolver;
+use AIMultilingual\Promotion\PromotionAudit;
+use AIMultilingual\Promotion\ReviewToken;
+use AIMultilingual\Promotion\TranslationConflictDetector;
+use AIMultilingual\Promotion\TranslationExportService;
+use AIMultilingual\Promotion\TranslationImportService;
 use AIMultilingual\Rest\ViewModel\ReviewQueueItemSerializer;
 use AIMultilingual\Rest\ViewModel\WorkspacePageSummarySerializer;
 use AIMultilingual\Rest\ViewModel\WorkspaceSegmentSerializer;
@@ -175,6 +185,7 @@ use AIMultilingual\Translation\TermTranslationResolver;
 use AIMultilingual\Workspace\QA\Checks\GlossaryTermCheck;
 use AIMultilingual\Workspace\QA\QAEngine;
 use AIMultilingual\Workspace\PreviewService;
+use AIMultilingual\Promotion\PromotionCapabilities;
 use AIMultilingual\Workspace\Review\ReviewCapabilities;
 use AIMultilingual\Workspace\Review\ReviewEditInvalidationAuditBridge;
 use AIMultilingual\Workspace\Review\ReviewWorkflowService;
@@ -975,6 +986,38 @@ final class Plugin {
 		( new ReviewEditInvalidationAuditBridge() )->register();
 		( new PublicationEditInvalidationAuditBridge( $publication_audit ) )->register();
 
+		// DEV → PROD translation promotion (ADR-0030). The capability-widening
+		// filter must be available to REST, CLI and admin alike.
+		( new PromotionCapabilities() )->register();
+
+		$promotion_identities = new ObjectIdentityRepository();
+		$promotion_log        = new PromotionLogRepository(
+			(int) ( $settings->get()['promotion_log_retention'] ?? PromotionLogRepository::DEFAULT_RETENTION )
+		);
+		$promotion_audit      = new PromotionAudit();
+		$promotion_export     = new TranslationExportService(
+			$store,
+			$languages,
+			$promotion_identities,
+			$promotion_log,
+			$promotion_audit
+		);
+		$promotion_import     = new TranslationImportService(
+			$store,
+			$languages,
+			new ObjectIdentityResolver( $promotion_identities ),
+			new PromotionStateRepository(),
+			$promotion_identities,
+			$promotion_log,
+			$promotion_audit,
+			$settings,
+			new TranslationConflictDetector(),
+			new ReviewToken(),
+			$review,
+			$publication
+		);
+		( new PromotionController( $promotion_export, $promotion_import, $promotion_log ) )->register();
+
 		// Stale invalidation is owned by RequestLocalInvalidationCoordinator
 		// (save_post + Rank Math meta mark dirty; shutdown flush). Do not sync here.
 
@@ -999,6 +1042,7 @@ final class Plugin {
 			( new TranslatorWorkspace( $languages ) )->register();
 			( new GlossaryAdminPage( $languages ) )->register();
 			( new TermLocalizedSlugAdmin( $languages ) )->register();
+			( new \AIMultilingual\Admin\PromotionAdminPage( $languages ) )->register();
 
 			// Bind-mount deployments update files in place and never fire the
 			// activation hook, so schema drift has to be caught on its own.
@@ -1006,6 +1050,7 @@ final class Plugin {
 				'admin_init',
 				static function () {
 					( new Migrator() )->maybe_migrate();
+					PromotionCapabilities::provision();
 				}
 			);
 			add_action( 'admin_notices', array( Migrator::class, 'render_blocked_notice' ) );
@@ -1051,6 +1096,7 @@ final class Plugin {
 			ExtensionCli::register( $extension_registrar, $extension_diagnostics );
 			RolloutCli::register();
 			JobsCli::register( $job_service, $job_batches, $job_scheduler, $job_worker, $job_leases, $job_concurrency );
+			\AIMultilingual\Promotion\PromotionCli::register( $promotion_export, $promotion_import, $promotion_log, $promotion_identities );
 		}
 	}
 
@@ -1080,6 +1126,7 @@ final class Plugin {
 		GlossaryCapabilities::grant_default_roles();
 		ReviewCapabilities::grant_default_roles();
 		JobsCapabilities::grant_default_roles();
+		PromotionCapabilities::provision();
 	}
 
 	/**

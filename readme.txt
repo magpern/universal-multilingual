@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.13.0
+Stable tag: 1.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,15 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.14.0 =
+* DEV -> PROD translation promotion (ADR-0030): export reviewed translations as a versioned .json package, import on another environment with a strictly read-only dry-run, review new/updates/conflicts/stale/missing/route classifications, then explicitly apply. Idempotent and safe to re-run.
+* Cross-environment identity: plugin-owned UUID + deterministic environment-independent natural key (new aiml_object_identity table). The UUID is authoritative once both sites have seen the object, so renames on either side do not break matching.
+* Three-way merge baseline (new aiml_promotion_state table) tells an ordinary update from a translation edited independently on the target; conflicts and stale translations are never applied in Safe mode.
+* Apply re-uploads the package and re-plans; a stateless signed review token binds the apply to the reviewed dry-run, and any drift since review refuses the whole apply.
+* Conservative locale mapping (exact locale, safe code fallback only; pt_BR never maps to pt_PT); no language is ever auto-created. Routes/history stay per-environment; only the translated slug candidate is imported.
+* REST (aiml/v1/promotion/*), an admin screen under Universal Multilingual, and wp aiml promotion export|import|history|backfill-identity share one service layer. New aiml_promotion_audit hook and aiml_promotion_log table.
+* Schema 9 -> 10 (aiml_object_identity, aiml_promotion_state, aiml_promotion_log). Settings shape 2 -> 3. New capabilities aiml_promote_translations and aiml_trust_promoted_review_state (administrators only by default).
 
 = 1.13.0 =
 * Add a language is now selection, not data entry: pick a language (and a region where relevant); the URL code, locale, name, native name and direction are derived server-side from a bundled locale registry (offline; no language packs). A gated "Advanced: custom language" path covers unusual locales.

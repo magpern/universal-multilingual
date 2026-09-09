@@ -35,7 +35,9 @@ final class SettingsSanitizeTest extends TestCase {
 		$this->assertTrue( $defaults['floating_selector_show_desktop'] );
 		$this->assertTrue( $defaults['floating_selector_show_mobile'] );
 		$this->assertTrue( $defaults['floating_selector_persist_preference'] );
-		$this->assertSame( 2, Settings::SCHEMA_VERSION );
+		$this->assertSame( 3, Settings::SCHEMA_VERSION );
+		$this->assertSame( 26214400, $defaults['promotion_max_package_bytes'] );
+		$this->assertSame( 200, $defaults['promotion_log_retention'] );
 		$this->assertFalse( $defaults['block_attr_registration_enabled'] );
 		$this->assertFalse( $defaults['block_uuid_injection_enabled'] );
 		$this->assertFalse( $defaults['block_extraction_enabled'] );

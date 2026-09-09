@@ -84,7 +84,7 @@ final class PublicationSeoWooAcceptanceTest extends AimlTestCase {
 		$fresh = $this->languages->find( (int) $language->language_id );
 		$this->assertNotNull( $fresh );
 		$this->assertSame( \AIMultilingual\Language\Languages::STATUS_PUBLISHED, (string) $fresh->status );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 	}
 
 	public function test_publication_does_not_mutate_post_status_or_meta_price_stock(): void {

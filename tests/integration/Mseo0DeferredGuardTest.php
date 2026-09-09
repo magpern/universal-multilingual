@@ -25,7 +25,7 @@ final class Mseo0DeferredGuardTest extends AimlTestCase {
 	}
 
 	public function test_target_is_eight(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 	}
 
 	public function test_path_hash_uses_sha256(): void {

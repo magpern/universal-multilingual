@@ -26,8 +26,8 @@ final class LanguageLocaleMigrationTest extends AimlTestCase {
 	public function test_live_schema_is_at_version_nine(): void {
 		global $wpdb;
 
-		$this->assertSame( 9, Migrator::TARGET );
-		$this->assertSame( 9, (int) get_option( Migrator::OPTION ) );
+		$this->assertSame( 10, Migrator::TARGET );
+		$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ) );
 
 		$table = Schema::languages();
 
@@ -81,7 +81,7 @@ final class LanguageLocaleMigrationTest extends AimlTestCase {
 		$migrator->maybe_migrate();
 		$migrator->maybe_migrate();
 
-		$this->assertSame( 9, $migrator->current_version() );
+		$this->assertSame( Migrator::TARGET, $migrator->current_version() );
 		$this->assertFalse( (bool) get_option( Migrator::BLOCKED_OPTION ) );
 
 		update_option( Migrator::OPTION, Migrator::TARGET, true );
@@ -136,7 +136,7 @@ final class LanguageLocaleMigrationTest extends AimlTestCase {
 
 			( new Migrator() )->maybe_migrate();
 
-			$this->assertSame( 9, (int) get_option( Migrator::OPTION ), 'The upgrade must complete once no locale is shared.' );
+			$this->assertSame( Migrator::TARGET, (int) get_option( Migrator::OPTION ), 'The upgrade must complete once no locale is shared.' );
 			$this->assertFalse( (bool) get_option( Migrator::BLOCKED_OPTION ) );
 		} finally {
 			// phpcs:disable WordPress.DB

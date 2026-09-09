@@ -40,7 +40,7 @@ final class Migrator {
 	/**
 	 * Schema version this build expects.
 	 */
-	public const TARGET = 9;
+	public const TARGET = 10;
 
 	/**
 	 * Applies any migration steps newer than the recorded version.
@@ -95,15 +95,16 @@ final class Migrator {
 	 */
 	private function steps(): array {
 		return array(
-			1 => array( $this, 'step_1_initial_tables' ),
-			2 => array( $this, 'step_2_translation_memory' ),
-			3 => array( $this, 'step_3_rollout_metrics_daily' ),
-			4 => array( $this, 'step_4_glossary' ),
-			5 => array( $this, 'step_5_review_workflow' ),
-			6 => array( $this, 'step_6_background_jobs' ),
-			7 => array( $this, 'step_7_publication_axis' ),
-			8 => array( $this, 'step_8_mseo_localized_url_foundation' ),
-			9 => array( $this, 'step_9_language_metadata' ),
+			1  => array( $this, 'step_1_initial_tables' ),
+			2  => array( $this, 'step_2_translation_memory' ),
+			3  => array( $this, 'step_3_rollout_metrics_daily' ),
+			4  => array( $this, 'step_4_glossary' ),
+			5  => array( $this, 'step_5_review_workflow' ),
+			6  => array( $this, 'step_6_background_jobs' ),
+			7  => array( $this, 'step_7_publication_axis' ),
+			8  => array( $this, 'step_8_mseo_localized_url_foundation' ),
+			9  => array( $this, 'step_9_language_metadata' ),
+			10 => array( $this, 'step_10_promotion_foundation' ),
 		);
 	}
 
@@ -384,6 +385,26 @@ final class Migrator {
 		delete_option( self::BLOCKED_OPTION );
 
 		return true;
+	}
+
+	/**
+	 * Step 10 — DEV → PROD translation promotion foundation (ADR-0030).
+	 *
+	 * Creates the three promotion tables (`aiml_object_identity`,
+	 * `aiml_promotion_state`, `aiml_promotion_log`). No column is added to
+	 * `aiml_translations`: the cross-environment merge baseline lives in
+	 * `aiml_promotion_state`, keyed by identity rather than by numeric ID, so
+	 * translation storage is not polluted with promotion provenance.
+	 *
+	 * `CREATE TABLE IF NOT EXISTS` keeps the step idempotent for an interrupted
+	 * upgrade.
+	 */
+	private function step_10_promotion_foundation(): void {
+		global $wpdb;
+
+		$wpdb->query( Schema::create_object_identity() ); // phpcs:ignore WordPress.DB.PreparedSQL, WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( Schema::create_promotion_state() ); // phpcs:ignore WordPress.DB.PreparedSQL, WordPress.DB.DirectDatabaseQuery
+		$wpdb->query( Schema::create_promotion_log() );   // phpcs:ignore WordPress.DB.PreparedSQL, WordPress.DB.DirectDatabaseQuery
 	}
 
 	/**

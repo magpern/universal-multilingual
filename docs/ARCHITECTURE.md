@@ -149,7 +149,37 @@ src/
     SettingsPage.php    Languages and Settings screens
     Editor.php          Minimal translation editor
   Cli.php               Four WP-CLI commands
+  Promotion/            DEV -> PROD translation promotion (ADR-0030)
+    ObjectNaturalKey.php        Deterministic env-independent key builder (pure)
+    TranslationPackage.php      Manifest/payload + dual checksums (pure)
+    JsonPackageSerializer.php   Untrusted-input decode (size/depth/shape)
+    TranslationPackageValidator.php  format v1 + UUID + checksums
+    ObjectIdentityResolver.php  Read-only UUID-first -> natural key -> fingerprint
+    TranslationConflictDetector.php  3-way merge truth table (pure)
+    LanguageMap.php             Conservative locale/code mapping (pure)
+    ReviewToken.php             Stateless HMAC dry-run token (pure crypto)
+    TranslationExportService.php  Walk -> Store reads -> mint UUID -> package
+    TranslationImportService.php  validate() / plan() (read-only) / apply()
+    PromotionCli.php            wp aiml promotion ...
+  Rest/PromotionController.php   aiml/v1/promotion/{export,import/*,history}
+  Admin/PromotionAdminPage.php   Vanilla wp-api-fetch screen
+  Database/
+    ObjectIdentityRepository.php / PromotionStateRepository.php /
+    PromotionLogRepository.php   The only $wpdb access for the three new tables
 ```
+
+## Translation promotion (ADR-0030)
+
+Promotion never copies `aiml_*` tables. It serializes translated **segments**
+with a plugin-owned **UUID** (minted on the source before export) plus a
+deterministic natural key, and a per-segment source hash. Import is a
+strictly read-only **dry-run** (classify every segment against the local
+`Store` row and the `aiml_promotion_state` baseline; mint nothing; emit no
+hooks) that returns a stateless signed **review token**, followed by an
+explicit **apply** that re-verifies the token, re-plans, refuses on any drift,
+revalidates each row's preconditions immediately before writing, and writes
+only through `Store::save_translation()` / `save_slug_candidate()`. Routes stay
+a per-environment projection — only the slug candidate crosses.
 
 Resolution and request state are separate classes on purpose: one is a pure
 function evaluated once, the other is mutable state read by every overlay for

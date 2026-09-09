@@ -70,7 +70,8 @@ final class BatchAiTranslateModeTest extends AimlTestCase {
 	}
 
 	/**
-	 * @param string $uuid Block uuid.
+	 * @param string $uuid        Block uuid.
+	 * @param int    $language_id Target language id.
 	 */
 	private function machine_page( string $uuid, int $language_id ): \WP_Post {
 		$post = $this->create_block_page( $uuid );
@@ -96,7 +97,9 @@ final class BatchAiTranslateModeTest extends AimlTestCase {
 	}
 
 	/**
-	 * @param string $mode Requested job type (or '').
+	 * @param array<int, \WP_Post> $posts       Fixture pages.
+	 * @param int                  $language_id Target language id.
+	 * @param string               $mode        Requested job type (or '').
 	 * @return array<string, mixed> The coordinator result.
 	 */
 	private function create_bulk( array $posts, int $language_id, string $mode ): array {

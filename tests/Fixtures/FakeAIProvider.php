@@ -55,7 +55,7 @@ final class FakeAIProvider implements AIProviderInterface {
 	 * @param int    $fail_first Fail only the first N calls, then behave as OK.
 	 */
 	public function __construct( string $mode = self::MODE_OK, int $fail_first = 0 ) {
-		$this->mode      = $mode;
+		$this->mode       = $mode;
 		$this->fail_first = $fail_first;
 	}
 

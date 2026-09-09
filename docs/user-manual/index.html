@@ -498,6 +498,19 @@ footer.doc-foot {
 <section id="translating-content" data-section>
   <h2>5. Translating content</h2>
 
+  <h3>Translate with AI (one page)</h3>
+  <p>On the Translator Workspace editor, once a page and a target language are loaded, click <strong>Translate with AI</strong>. Pick a mode:</p>
+  <ul>
+    <li><strong>Translate missing</strong> (default) — only segments with no translation yet.</li>
+    <li><strong>Retranslate stale</strong> — machine translations whose source text changed.</li>
+    <li><strong>Retranslate AI translations</strong> — every existing machine translation, stale or not (a confirmation explains what is replaced).</li>
+  </ul>
+  <p>The action runs a background job, starts it immediately, and refreshes the editor when it finishes with a plain summary (<em>N translated · M kept · F failed</em>). You can close the browser while it runs. <strong>Manually edited, reviewed and in-review translations are never replaced by any mode</strong> — they are counted as “kept”. If AI translation is not configured, the button stays visible but disabled with a link to the settings screen (administrators only).</p>
+  <p>The older <span class="menu-path">Multilingual → Translate</span> screen now links straight into this flow with the page and language preselected.</p>
+
+  <h3>Translate with AI (many pages)</h3>
+  <p><span class="menu-path">Workspace → Site Translate</span>, or select pages/posts in the WordPress list table and choose the <strong>Translate with AI</strong> bulk action. Pick a target language and a mode, then <strong>Translate selected with AI</strong> — the jobs are created and started in one step. Progress, failures and retry are on the Jobs view.</p>
+
   <h3>Posts &amp; pages</h3>
   <p>Use Workspace Operations/Translate. Hierarchical pages share the Localized URL panel with posts once Localized URLs are On and shapes are admitted.</p>
 

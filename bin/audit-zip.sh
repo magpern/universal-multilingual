@@ -41,6 +41,7 @@ required = {
     "universal-multilingual/readme.txt",
     "universal-multilingual/vendor/autoload.php",
     "universal-multilingual/assets/block-editor.js",
+    "universal-multilingual/assets/admin-ui/aiml-ui.css",
     "universal-multilingual/assets/glossary-admin/glossary-admin.js",
     "universal-multilingual/assets/term-slug-admin/term-slug-admin.js",
     "universal-multilingual/assets/promotion-admin/promotion-admin.js",

@@ -106,9 +106,15 @@ final class LanguagesScreen {
 
 		wp_enqueue_style( 'wp-components' );
 		wp_enqueue_style(
+			'aiml-admin-ui',
+			plugins_url( 'assets/admin-ui/aiml-ui.css', AIML_PLUGIN_FILE ),
+			array( 'wp-components' ),
+			$version
+		);
+		wp_enqueue_style(
 			self::ASSET_HANDLE,
 			plugins_url( 'assets/languages-admin/languages-admin.css', AIML_PLUGIN_FILE ),
-			array( 'wp-components' ),
+			array( 'aiml-admin-ui' ),
 			$version
 		);
 		wp_enqueue_script(
@@ -130,7 +136,7 @@ final class LanguagesScreen {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 
 		if ( null !== $screen && in_array( (string) $screen->id, $this->screen_hooks(), true ) ) {
-			$classes .= ' ' . self::BODY_CLASS;
+			$classes .= ' aiml-ui ' . self::BODY_CLASS;
 		}
 
 		return $classes;

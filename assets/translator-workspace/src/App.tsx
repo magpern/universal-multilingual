@@ -22,6 +22,7 @@ import {
 import BulkToolbar from './components/BulkToolbar';
 import LanguageSelect from './components/LanguageSelect';
 import PostSelect from './components/PostSelect';
+import PageAiTranslate from './components/PageAiTranslate';
 import PublishContext from './components/PublishContext';
 import LocalizedSlugPanel from './components/LocalizedSlugPanel';
 import ReviewDecisionDialog from './components/ReviewDecisionDialog';
@@ -1055,6 +1056,13 @@ export default function App() {
 									</Button>
 								</div>
 							</div>
+							<PageAiTranslate
+								postId={ postId }
+								languageCode={ languageCode }
+								languages={ languages }
+								canManageJobs={ canManageJobs }
+								onComplete={ loadSegments }
+							/>
 							{ previewError && (
 								<Notice status="error" isDismissible={ false }>
 									{ previewError }

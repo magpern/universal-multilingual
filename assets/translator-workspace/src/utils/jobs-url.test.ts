@@ -16,6 +16,7 @@ describe( 'jobs-url', () => {
 			view: 'jobs',
 			jobId: 42,
 			itemId: 7,
+			batchId: null,
 		} );
 	} );
 
@@ -26,6 +27,7 @@ describe( 'jobs-url', () => {
 			view: null,
 			jobId: null,
 			itemId: null,
+			batchId: null,
 		} );
 	} );
 

@@ -1,6 +1,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 
 import type {
+	AiTranslateMode,
 	BatchProgressSummary,
 	JobAction,
 	JobStatus,
@@ -43,6 +44,8 @@ export function jobTypeLabel( jobType: string ): string {
 			return __( 'Translate missing', 'ai-multilingual' );
 		case 'retranslate_stale':
 			return __( 'Retranslate stale', 'ai-multilingual' );
+		case 'retranslate_machine':
+			return __( 'Retranslate AI translations', 'ai-multilingual' );
 		case 'bulk_translate':
 			return __( 'Bulk translate', 'ai-multilingual' );
 		default:
@@ -50,12 +53,67 @@ export function jobTypeLabel( jobType: string ): string {
 	}
 }
 
+/**
+ * Shared `.aiml-ui-badge--*` modifier for a job execution status (ADR-0031).
+ * Execution state only — review state is a separate badge.
+ */
+export function jobStatusBadgeVariant( status: string ): string {
+	switch ( status ) {
+		case 'running':
+			return 'translating';
+		case 'completed':
+			return 'complete';
+		case 'completed_with_errors':
+			return 'completed-with-skips';
+		case 'failed':
+		case 'cancelled':
+			return 'failed';
+		case 'queued':
+		case 'paused':
+		case 'retry_wait':
+		default:
+			return 'queued';
+	}
+}
+
+/**
+ * The frozen three-mode "Translate with AI" vocabulary and its job-type mapping
+ * (ADR-0031). `bulkJobType` is what a multi-post batch uses for the same mode.
+ */
+export function aiTranslateModeOptions(): Array< {
+	value: AiTranslateMode;
+	label: string;
+	jobType: JobType;
+	bulkJobType: JobType;
+} > {
+	return [
+		{
+			value: 'missing',
+			label: __( 'Translate missing', 'ai-multilingual' ),
+			jobType: 'translate_missing',
+			bulkJobType: 'bulk_translate',
+		},
+		{
+			value: 'stale',
+			label: __( 'Retranslate stale', 'ai-multilingual' ),
+			jobType: 'retranslate_stale',
+			bulkJobType: 'retranslate_stale',
+		},
+		{
+			value: 'machine',
+			label: __( 'Retranslate AI translations', 'ai-multilingual' ),
+			jobType: 'retranslate_machine',
+			bulkJobType: 'retranslate_machine',
+		},
+	];
+}
+
 export function jobStatusLabel( status: string ): string {
 	switch ( status ) {
 		case 'queued':
-			return __( 'Waiting', 'ai-multilingual' );
+			return __( 'Queued', 'ai-multilingual' );
 		case 'running':
-			return __( 'Running', 'ai-multilingual' );
+			return __( 'Translating', 'ai-multilingual' );
 		case 'paused':
 			return __( 'Paused', 'ai-multilingual' );
 		case 'retry_wait':

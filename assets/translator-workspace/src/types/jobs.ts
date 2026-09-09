@@ -2,7 +2,15 @@ export type JobType =
 	| 'translate_selected'
 	| 'translate_missing'
 	| 'retranslate_stale'
+	| 'retranslate_machine'
 	| 'bulk_translate';
+
+/**
+ * The three user-facing "Translate with AI" modes (ADR-0031). "Force" is
+ * deliberately not offered: manual, reviewed and in-review translations are
+ * never replaced by a page or bulk AI action.
+ */
+export type AiTranslateMode = 'missing' | 'stale' | 'machine';
 
 export type JobStatus =
 	| 'queued'
@@ -116,10 +124,13 @@ export interface CreateSingleJobPayload {
 	prompt_version?: string;
 	provider_id?: string;
 	force_new?: boolean;
+	/** User-facing "Translate with AI" actions enqueue immediately (ADR-0031). */
+	autostart?: boolean;
 }
 
 export interface CreateBulkJobPayload {
 	language_id: number;
+	autostart?: boolean;
 	posts: Array< {
 		source_id: number;
 		segment_keys?: string[];

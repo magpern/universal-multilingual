@@ -77,6 +77,30 @@ final class ProviderRegistry {
 	}
 
 	/**
+	 * Whether AI translation is configured enough to attempt (enabled, a
+	 * provider selected, and that provider has a stored credential). A UI hint
+	 * only — the create path still fails closed if the credential is invalid.
+	 *
+	 * @param Settings $settings Settings accessor.
+	 */
+	public static function is_ai_configured( Settings $settings ): bool {
+		$data = $settings->get();
+
+		if ( empty( $data['ai_enabled'] ) ) {
+			return false;
+		}
+
+		$provider = (string) ( $data['ai_provider'] ?? '' );
+		if ( '' === $provider || NullAIProvider::ID === $provider ) {
+			return false;
+		}
+
+		$row = ( $data['ai_providers'] ?? array() )[ $provider ] ?? array();
+
+		return is_array( $row ) && '' !== (string) ( $row['api_key_encrypted'] ?? '' );
+	}
+
+	/**
 	 * Resolves the active provider from settings, or the fallback.
 	 */
 	public function active(): AIProviderInterface {

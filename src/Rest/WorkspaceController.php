@@ -1691,6 +1691,7 @@ final class WorkspaceController {
 				'job_id'   => $result['job_id'] ?? null,
 				'segments' => $this->segment_serializer->many_to_arrays( $result['segments'] ),
 				'errors'   => $result['errors'],
+				'skipped'  => $result['skipped'] ?? array(),
 			)
 		);
 	}

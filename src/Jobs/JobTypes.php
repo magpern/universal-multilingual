@@ -14,13 +14,18 @@ namespace AIMultilingual\Jobs;
  */
 final class JobTypes {
 
-	public const TRANSLATE_SELECTED = 'translate_selected';
-	public const TRANSLATE_MISSING  = 'translate_missing';
-	public const RETRANSLATE_STALE  = 'retranslate_stale';
-	public const BULK_TRANSLATE     = 'bulk_translate';
+	public const TRANSLATE_SELECTED  = 'translate_selected';
+	public const TRANSLATE_MISSING   = 'translate_missing';
+	public const RETRANSLATE_STALE   = 'retranslate_stale';
+	public const RETRANSLATE_MACHINE = 'retranslate_machine';
+	public const BULK_TRANSLATE      = 'bulk_translate';
 
 	/**
-	 * All MVP job type codes.
+	 * All job type codes.
+	 *
+	 * `retranslate_machine` (AIT1 / ADR-0031) replaces every eligible
+	 * machine translation for an object regardless of stale state; manual,
+	 * reviewed and in-review segments are still never touched.
 	 *
 	 * @return list<string>
 	 */
@@ -29,6 +34,7 @@ final class JobTypes {
 			self::TRANSLATE_SELECTED,
 			self::TRANSLATE_MISSING,
 			self::RETRANSLATE_STALE,
+			self::RETRANSLATE_MACHINE,
 			self::BULK_TRANSLATE,
 		);
 	}
@@ -44,6 +50,7 @@ final class JobTypes {
 			array(
 				self::TRANSLATE_SELECTED,
 				self::RETRANSLATE_STALE,
+				self::RETRANSLATE_MACHINE,
 			),
 			true
 		);

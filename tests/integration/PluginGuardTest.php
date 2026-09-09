@@ -128,6 +128,9 @@ final class PluginGuardTest extends AimlTestCase {
 		$allowed = array(
 			'src/Database/Schema.php',
 			'src/Database/Migrator.php',
+			'src/Database/ObjectIdentityRepository.php',
+			'src/Database/PromotionStateRepository.php',
+			'src/Database/PromotionLogRepository.php',
 			'src/Language/Languages.php',
 			'src/Translation/Store.php',
 			'src/Translation/Memory/TMRepository.php',
@@ -717,7 +720,7 @@ final class PluginGuardTest extends AimlTestCase {
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
 		$this->assertStringContainsString( 'step_8_mseo_localized_url_foundation', $migrator );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		// AC36 — sole hosted-key builder; no duplicate alias implementation.
 		$alias_builders = array();
@@ -1115,7 +1118,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 * MSEO.2 public routing structural guards.
 	 */
 	public function test_mseo2_public_routing_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 		$this->assertFileExists( $this->root() . '/src/Routing/RouteRecognitionContext.php' );
 
 		$router = (string) file_get_contents( $this->root() . '/src/Routing/Router.php' );
@@ -1153,7 +1156,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 */
 	public function test_mseo0_inert_foundation_boundaries(): void {
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 		$this->assertStringContainsString( 'step_8_mseo_localized_url_foundation', $migrator );
 
 		$this->assertFileExists( $this->root() . '/src/Routing/PathHash.php' );
@@ -1174,7 +1177,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 * MSEO.1 lifecycle boundaries — TARGET 8, prepared routes, no public routing.
 	 */
 	public function test_mseo1_lifecycle_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		foreach ( array(
 			\AIMultilingual\Routing\SlugCandidateService::class,
@@ -1212,7 +1215,7 @@ final class PluginGuardTest extends AimlTestCase {
 		$this->assertStringContainsString( 'render_localized_urls_settings', $settings_page );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
 
 		$route_pub = (string) file_get_contents( $this->root() . '/src/Routing/RoutePublicationService.php' );
 		$this->assertStringContainsString( 'publish_under_route_authority', $route_pub );
@@ -1223,7 +1226,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 * MSEO.3 hierarchy/term routing structural guards.
 	 */
 	public function test_mseo3_hierarchy_term_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$this->assertFileExists( $this->root() . '/src/Routing/RoutingCapabilityAdmission.php' );
 		$this->assertFileExists( $this->root() . '/src/Routing/HierarchyPathBuilder.php' );
@@ -1252,8 +1255,8 @@ final class PluginGuardTest extends AimlTestCase {
 		$this->assertStringContainsString( 'localized-urls reindex-status', $cli );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$cap_job = (string) file_get_contents( $this->root() . '/src/Jobs/CapabilityVerificationJob.php' );
 		$this->assertStringContainsString( 'commit_admission', $cap_job );
@@ -1274,7 +1277,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 * MSEO.4 WooCommerce localized product permalink structural guards.
 	 */
 	public function test_mseo4_woo_product_permalink_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$this->assertFileExists( $this->root() . '/src/Routing/WooProductCategoryAuthority.php' );
 		$this->assertFileExists( $this->root() . '/src/Routing/WooProductPathBuilder.php' );
@@ -1325,8 +1328,8 @@ final class PluginGuardTest extends AimlTestCase {
 		$this->assertStringContainsString( 'is_same_normalized_url', $router );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
+		$this->assertSame( 10, Migrator::TARGET );
 	}
 
 	/**
@@ -1335,10 +1338,10 @@ final class PluginGuardTest extends AimlTestCase {
 	 * Does not assert ROADMAP prose or closure-document workflow state (A10).
 	 */
 	public function test_mseo5_program_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
 		$this->assertStringContainsString( 'step_8_mseo_localized_url_foundation', $migrator );
 
 		foreach ( array(
@@ -1433,11 +1436,11 @@ final class PluginGuardTest extends AimlTestCase {
 	 * V1.5.1 corrective milestone architecture guards.
 	 */
 	public function test_v151_corrective_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$router = (string) file_get_contents( $this->root() . '/src/Routing/Router.php' );
 		$this->assertStringContainsString( 'filtering_term_link', $router );
@@ -1474,11 +1477,11 @@ final class PluginGuardTest extends AimlTestCase {
 	 * P0 Localized URL Operator Completion architecture guards.
 	 */
 	public function test_p0_operator_completion_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
 
 		$version = (string) file_get_contents( $this->root() . '/universal-multilingual.php' );
 		$this->assertMatchesRegularExpression( '/Version:\s*1\.13\.0/', $version );
@@ -1514,7 +1517,7 @@ final class PluginGuardTest extends AimlTestCase {
 	 * P2 Jobs / stale operator literacy — TARGET 8, no new Job type, A1 via missing resolve.
 	 */
 	public function test_p2_jobs_stale_literacy_boundaries(): void {
-		$this->assertSame( 9, Migrator::TARGET );
+		$this->assertSame( 10, Migrator::TARGET );
 
 		$version = (string) file_get_contents( $this->root() . '/universal-multilingual.php' );
 		$this->assertMatchesRegularExpression( '/Version:\s*1\.13\.0/', $version );
@@ -1551,6 +1554,6 @@ final class PluginGuardTest extends AimlTestCase {
 		}
 
 		$migrator = (string) file_get_contents( $this->root() . '/src/Database/Migrator.php' );
-		$this->assertStringNotContainsString( 'step_10_', $migrator );
+		$this->assertStringNotContainsString( 'step_11_', $migrator );
 	}
 }

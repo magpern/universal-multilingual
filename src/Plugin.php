@@ -175,6 +175,7 @@ use AIMultilingual\Translation\TermTranslationResolver;
 use AIMultilingual\Workspace\QA\Checks\GlossaryTermCheck;
 use AIMultilingual\Workspace\QA\QAEngine;
 use AIMultilingual\Workspace\PreviewService;
+use AIMultilingual\Promotion\PromotionCapabilities;
 use AIMultilingual\Workspace\Review\ReviewCapabilities;
 use AIMultilingual\Workspace\Review\ReviewEditInvalidationAuditBridge;
 use AIMultilingual\Workspace\Review\ReviewWorkflowService;
@@ -975,6 +976,10 @@ final class Plugin {
 		( new ReviewEditInvalidationAuditBridge() )->register();
 		( new PublicationEditInvalidationAuditBridge( $publication_audit ) )->register();
 
+		// DEV → PROD translation promotion (ADR-0030). The capability-widening
+		// filter must be available to REST, CLI and admin alike.
+		( new PromotionCapabilities() )->register();
+
 		// Stale invalidation is owned by RequestLocalInvalidationCoordinator
 		// (save_post + Rank Math meta mark dirty; shutdown flush). Do not sync here.
 
@@ -1006,6 +1011,7 @@ final class Plugin {
 				'admin_init',
 				static function () {
 					( new Migrator() )->maybe_migrate();
+					PromotionCapabilities::provision();
 				}
 			);
 			add_action( 'admin_notices', array( Migrator::class, 'render_blocked_notice' ) );
@@ -1080,6 +1086,7 @@ final class Plugin {
 		GlossaryCapabilities::grant_default_roles();
 		ReviewCapabilities::grant_default_roles();
 		JobsCapabilities::grant_default_roles();
+		PromotionCapabilities::provision();
 	}
 
 	/**

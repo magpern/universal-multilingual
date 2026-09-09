@@ -20,7 +20,7 @@ use ReflectionClass;
 final class AseoeDeferredGuardTest extends AimlTestCase {
 
 	public function test_target_remains_six(): void {
-		$this->assertSame( Migrator::TARGET, 9 );
+		$this->assertSame( Migrator::TARGET, 10 );
 	}
 
 	public function test_no_sitemap_discovery_or_emitter_classes(): void {

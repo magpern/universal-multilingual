@@ -55,6 +55,7 @@ foreach ( array_keys( $aiml_roles->roles ) as $aiml_role_name ) {
 \AIMultilingual\Glossary\GlossaryCapabilities::revoke_all_roles();
 \AIMultilingual\Workspace\Review\ReviewCapabilities::revoke_all_roles();
 \AIMultilingual\Jobs\JobsCapabilities::revoke_all_roles();
+\AIMultilingual\Promotion\PromotionCapabilities::revoke_all_roles();
 
 // 3. Action Scheduler callbacks (J4 registers these; safe no-op when AS absent).
 if ( function_exists( 'as_unschedule_all_actions' ) ) {
@@ -65,8 +66,10 @@ if ( function_exists( 'as_unschedule_all_actions' ) ) {
 // 4. Plugin options. Glossary lexicon version (ADR-0014) and cache epoch.
 delete_option( \AIMultilingual\Settings::OPTION );
 delete_option( \AIMultilingual\Database\Migrator::OPTION );
+delete_option( \AIMultilingual\Database\Migrator::BLOCKED_OPTION );
 delete_option( \AIMultilingual\Cache\Cache::VERSION_OPTION );
 delete_option( \AIMultilingual\Database\Schema::GLOSSARY_VERSION_OPTION );
+delete_option( \AIMultilingual\Promotion\PromotionCapabilities::VERSION_OPTION );
 
 // 5. Plugin-owned tables (translations includes Review Workflow columns from
 // schema v5; jobs tables from schema v6 — ADR-0011).

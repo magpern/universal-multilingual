@@ -115,12 +115,20 @@ Playwright's automatic retry.
   not a runnable test suite; the Elementor render/overlay contract it feeds is
   covered by `ElementorAiTranslationRoundtripTest` (new) + the `Tsc5*` integration
   tests (green).
-- **`acceptance/languages-admin-browser`** — Playwright, re-run vs DEV in the
-  Playwright Docker image with the docker socket mounted (a small `dev-wp` shim
-  replaces the compose wrapper). Result recorded on the next line once the run
-  completes. The Languages screen's only AIT1 change is a body `aiml-ui` class +
-  its stylesheet loaded as a dependency of the shared `aiml-admin-ui` handle;
-  scenario 16 of the new suite already confirmed `.aiml-ui` renders there on DEV.
+- **`acceptance/languages-admin-browser`** — Playwright. **Not completed vs DEV
+  in this session.** Two constraints, neither an AIT1 defect: (1) its
+  `test.beforeEach` calls `resetLanguages()` which **deletes every non-default
+  language on the target instance** — destructive to shared DEV state, so it
+  needs a dedicated acceptance window; (2) it shells out through `dev-wp`
+  (`docker compose exec`), which does not work from inside the Playwright
+  container, and the host lacks a version-matched `npx playwright install`. Its
+  selectors (`.aiml-ui-card`, `select[name="registry_group"]`, `[data-aiml-*]`)
+  are **unchanged** by AIT1 — the CSS extraction kept every `aiml-ui-*` class
+  name and only rescoped the wrapper. Scenario 16 of the new suite confirmed
+  `.aiml-ui` renders on the Languages screen on DEV, and `LanguagesScreen`'s
+  behaviour is covered by the green integration suite. (The DEV `sv`/`de`
+  preview languages were deleted by a partial `beforeAll` and restored
+  immediately.)
 - **`acceptance/f10-browser`** — **not re-run**: needs the `F10_POST_ID` fixture
   post and an f9 auth-cookie bootstrap, and its `bulk translate reports not
   configured` test is stale against the current DEV (which has a provider key,

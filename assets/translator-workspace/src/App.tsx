@@ -19,9 +19,12 @@ import {
 	submitReview,
 	suggestSegment,
 	translateBatch,
+	fetchObjectLanguages,
 } from './api/workspace-api';
 import BulkToolbar from './components/BulkToolbar';
-import LanguageSelect from './components/LanguageSelect';
+import LanguageChecklist from './components/LanguageChecklist';
+import LanguageTabs from './components/LanguageTabs';
+import ObjectLanguagesBar from './components/ObjectLanguagesBar';
 import PostSelect from './components/PostSelect';
 import PageAiTranslate from './components/PageAiTranslate';
 import PublishContext from './components/PublishContext';
@@ -37,9 +40,20 @@ import StatusFooter from './components/StatusFooter';
 import type { SegmentRow } from './types/segment-row';
 import type {
 	LanguageOption,
+	ObjectLanguagesResponse,
 	WorkspacePageSummary,
 	WorkspaceTranslationStatus,
 } from './types/view-models';
+import {
+	defaultSelection,
+	normalizeSelection,
+} from './utils/multi-language-selection';
+import {
+	emptyCache,
+	readCache,
+	writeCache,
+	type LanguageSegmentCache,
+} from './utils/language-segment-cache';
 import {
 	detailConflictMessage,
 	detailConflictStatusMessage,
@@ -212,6 +226,17 @@ export default function App() {
 	);
 	const [ suggestingKey, setSuggestingKey ] = useState< string | null >( null );
 
+	// MLW1a (WP3): multi-language workspace state. `languageCode` above is now
+	// the ACTIVE tab; the selected set drives which tabs exist and which
+	// languages a bulk action targets. Switching the active tab never changes
+	// the loaded object.
+	const [ selectedLanguageCodes, setSelectedLanguageCodes ] = useState<
+		string[]
+	>( () => defaultSelection( languages ) );
+	const [ objectLanguages, setObjectLanguages ] =
+		useState< ObjectLanguagesResponse | null >( null );
+	const segmentCacheRef = useRef< LanguageSegmentCache >( emptyCache() );
+
 	const dirtyCount = useMemo( () => countDirtyRows( rows ), [ rows ] );
 	const filteredRows = useMemo(
 		() =>
@@ -291,16 +316,32 @@ export default function App() {
 			return;
 		}
 
-		setLoading( true );
+		// MLW1a (WP3): show a cached tab immediately, then refresh in the
+		// background. The first open of a language has no cache.
+		const cached = readCache( segmentCacheRef.current, languageCode );
+		if ( cached ) {
+			setRows( cached.rows );
+			setStatus( cached.status );
+			setSegmentFilter( 'all' );
+			setSelectedKeys( clearSelection() );
+		}
+
+		setLoading( ! cached );
 		setError( '' );
 		setBatchMessage( '' );
 
 		try {
 			const response = await fetchSegments( postId, languageCode );
-			setRows( createRowsFromSegments( response.segments ) );
+			const freshRows = createRowsFromSegments( response.segments );
+			setRows( freshRows );
 			setStatus( response.status );
 			setSegmentFilter( 'all' );
 			setSelectedKeys( clearSelection() );
+			segmentCacheRef.current = writeCache(
+				segmentCacheRef.current,
+				languageCode,
+				{ rows: freshRows, status: response.status }
+			);
 		} catch {
 			setError(
 				__(
@@ -318,6 +359,35 @@ export default function App() {
 	useEffect( () => {
 		loadSegments();
 	}, [ loadSegments ] );
+
+	// MLW1a (WP3): object × language completeness for the loaded object.
+	const refreshObjectLanguages = useCallback( async () => {
+		if ( ! postId ) {
+			setObjectLanguages( null );
+			return;
+		}
+		try {
+			setObjectLanguages( await fetchObjectLanguages( postId ) );
+		} catch {
+			setObjectLanguages( null );
+		}
+	}, [ postId ] );
+
+	// The per-language segment cache belongs to one object — reset it whenever
+	// the object changes, and (re)load the completeness summary.
+	useEffect( () => {
+		segmentCacheRef.current = emptyCache();
+		void refreshObjectLanguages();
+	}, [ postId, refreshObjectLanguages ] );
+
+	// Keep the bar + tab badges in step after any load/translate/save/review
+	// (all of which end by writing the active-language `status`).
+	useEffect( () => {
+		if ( postId && status ) {
+			void refreshObjectLanguages();
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [ status ] );
 
 	const dirtyGuardRef = useRef< ( () => boolean ) | null >( null );
 	const navSnapshotRef = useRef< ( () => OperationsNavSnapshot ) | null >(
@@ -1019,6 +1089,40 @@ export default function App() {
 		languages.find( ( language ) => language.code === languageCode )?.status ??
 		'';
 
+	// MLW1a (WP3): tab descriptors for the selected set + server-authoritative
+	// status keyed by language code for the per-tab badge.
+	const languageTabs = normalizeSelection(
+		selectedLanguageCodes,
+		languages
+	).map( ( code ) => {
+		const match = languages.find( ( l ) => l.code === code );
+		return {
+			code,
+			name: match?.native_name || match?.name || code,
+		};
+	} );
+	const languageStatusByCode: Record<
+		string,
+		ObjectLanguagesResponse[ 'languages' ][ number ]
+	> = {};
+	for ( const entry of objectLanguages?.languages ?? [] ) {
+		languageStatusByCode[ entry.language_code ] = entry;
+	}
+
+	const handleSelectedLanguagesChange = ( next: string[] ) => {
+		setSelectedLanguageCodes( next );
+		if ( next.length > 0 && ! next.includes( languageCode ) ) {
+			setLanguageCode( next[ 0 ] );
+		}
+	};
+
+	const handleActiveLanguageChange = ( code: string ) => {
+		// Switching tabs changes the active language only — the loaded object
+		// stays put (ADR-0034 D1 / WP3).
+		setLanguageCode( code );
+		setSegmentFilter( 'all' );
+	};
+
 	return (
 		<div className="aiml-translator-workspace">
 			{ ( canTranslate || canReview || canViewJobs || canAccessOperations ) && (
@@ -1111,15 +1215,14 @@ export default function App() {
 							initialOpen={ true }
 						>
 							<div className="aiml-workspace-toolbar">
-								<LanguageSelect
+								<LanguageChecklist
 									languages={ languages }
-									value={ languageCode }
-									onChange={ ( code ) => {
-										setLanguageCode( code );
-										setPostId( null );
-										setPostSummary( null );
-										setSegmentFilter( 'all' );
-									} }
+									selected={ selectedLanguageCodes }
+									onChange={ handleSelectedLanguagesChange }
+									legend={ __(
+										'Languages to work on',
+										'ai-multilingual'
+									) }
 								/>
 								<PostSelect
 									languageCode={ languageCode }
@@ -1178,6 +1281,19 @@ export default function App() {
 									</Button>
 								</div>
 							</div>
+							{ postId && languageTabs.length > 0 && (
+								<LanguageTabs
+									tabs={ languageTabs }
+									active={ languageCode }
+									onSelect={ handleActiveLanguageChange }
+									statusByCode={ languageStatusByCode }
+								/>
+							) }
+							{ postId && objectLanguages && (
+								<ObjectLanguagesBar
+									summary={ objectLanguages.summary }
+								/>
+							) }
 							<PageAiTranslate
 								postId={ postId }
 								languageCode={ languageCode }
@@ -1186,6 +1302,7 @@ export default function App() {
 								onComplete={ () => {
 									void loadSegments();
 									setSlugRefresh( ( n ) => n + 1 );
+									void refreshObjectLanguages();
 								} }
 							/>
 							{ previewError && (

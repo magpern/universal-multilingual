@@ -33,6 +33,43 @@ final class TranslationRenderingTest extends AimlTestCase {
 		$this->assertSame( 'Om oss', apply_filters( 'the_title', $post->post_title, $post->ID ) );
 	}
 
+	public function test_woocommerce_short_description_renders_translated(): void {
+		$swedish = $this->add_language();
+		$id      = self::factory()->post->create(
+			array(
+				'post_type'    => 'product',
+				'post_title'   => 'IGF-1 LR3',
+				'post_content' => 'Long English description.',
+				'post_excerpt' => 'English short description.',
+				'post_status'  => 'publish',
+			)
+		);
+		$product = get_post( $id );
+		$this->assertInstanceOf( \WP_Post::class, $product );
+
+		$this->translate( $product, $swedish, Extractor::FIELD_EXCERPT, 'Svensk kort beskrivning.' );
+		$this->register_renderer();
+
+		$GLOBALS['post'] = $product; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		setup_postdata( $product );
+
+		// Default language: untouched (WooCommerce's own wpautop still runs).
+		$this->assertStringContainsString(
+			'English short description.',
+			(string) apply_filters( 'woocommerce_short_description', $product->post_excerpt )
+		);
+
+		$this->context->set_current( $swedish );
+
+		// WooCommerce echoes the raw post_excerpt through this filter, never
+		// get_the_excerpt — the overlay must catch it here too.
+		$out = (string) apply_filters( 'woocommerce_short_description', $product->post_excerpt );
+		$this->assertStringContainsString( 'Svensk kort beskrivning.', $out );
+		$this->assertStringNotContainsString( 'English short description.', $out );
+
+		wp_reset_postdata();
+	}
+
 	public function test_body_renders_translated(): void {
 		$swedish = $this->add_language();
 		$post    = $this->create_page( 'About Us', '<p>English body.</p>' );

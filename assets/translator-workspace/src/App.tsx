@@ -85,6 +85,7 @@ import {
 	selectedDirtyRows,
 	selectedEditableKeys,
 	selectedPendingReviewRows,
+	selectedSubmittableRows,
 	selectableRows,
 	toggleSelection,
 } from './utils/row-selection';
@@ -200,6 +201,7 @@ export default function App() {
 		useState< WorkspaceTranslationStatus | null >( null );
 	const [ loading, setLoading ] = useState( false );
 	const [ batchSaving, setBatchSaving ] = useState( false );
+	const [ slugRefresh, setSlugRefresh ] = useState( 0 );
 	const [ error, setError ] = useState( '' );
 	const [ previewError, setPreviewError ] = useState( '' );
 	const [ batchMessage, setBatchMessage ] = useState( '' );
@@ -506,6 +508,61 @@ export default function App() {
 						: candidate
 				)
 			);
+		}
+	};
+
+	const handleSubmitSelected = async () => {
+		if ( ! postId || ! languageCode ) {
+			return;
+		}
+		const targets = selectedSubmittableRows( rows, selectedKeys );
+		if ( targets.length === 0 ) {
+			return;
+		}
+		setBatchSaving( true );
+		setBatchMessage( '' );
+		try {
+			const result = await batchReview(
+				postId,
+				languageCode,
+				'submit',
+				targets.map( ( row ) => ( {
+					segment_key: row.segmentKey,
+					submitted_translation_hash:
+						row.server.submitted_translation_hash,
+				} ) ),
+				''
+			);
+			setRows( ( current ) => applyReviewBatchResults( current, result ) );
+			setSelectedKeys( clearSelection() );
+			setBatchMessage(
+				0 === result.errors.length
+					? sprintf(
+							/* translators: %d: submitted count */
+							__(
+								'%d segment(s) submitted for review.',
+								'ai-multilingual'
+							),
+							result.updated.length
+					  )
+					: sprintf(
+							/* translators: 1: succeeded, 2: failed */
+							__( '%1$d submitted, %2$d could not be.', 'ai-multilingual' ),
+							result.updated.length,
+							result.errors.length
+					  )
+			);
+		} catch ( unknownError ) {
+			setBatchMessage(
+				unknownError instanceof Error
+					? unknownError.message
+					: __(
+							'The segments could not be submitted for review.',
+							'ai-multilingual'
+					  )
+			);
+		} finally {
+			setBatchSaving( false );
 		}
 	};
 
@@ -918,6 +975,10 @@ export default function App() {
 	};
 
 	const reviewSelectedRows = selectedPendingReviewRows( rows, selectedKeys );
+	const submitSelectedRows = selectedSubmittableRows( rows, selectedKeys );
+	const currentLanguageStatus =
+		languages.find( ( language ) => language.code === languageCode )?.status ??
+		'';
 
 	return (
 		<div className="aiml-translator-workspace">
@@ -1072,13 +1133,25 @@ export default function App() {
 								languageCode={ languageCode }
 								languages={ languages }
 								canManageJobs={ canManageJobs }
-								onComplete={ loadSegments }
+								onComplete={ () => {
+									void loadSegments();
+									setSlugRefresh( ( n ) => n + 1 );
+								} }
 							/>
 							{ previewError && (
 								<Notice status="error" isDismissible={ false }>
 									{ previewError }
 								</Notice>
 							) }
+							{ currentLanguageStatus &&
+								currentLanguageStatus !== 'published' && (
+									<Notice status="info" isDismissible={ false }>
+										{ __(
+											'Preview opens the translated page for signed-in editors only — this language is not public yet. Publish the language to make it visible to visitors.',
+											'ai-multilingual'
+										) }
+									</Notice>
+								) }
 							{ postSummary && (
 								<p className="aiml-workspace-summary">
 									{ postSummary.post_title } · { postSummary.total_segments }{ ' ' }
@@ -1105,6 +1178,7 @@ export default function App() {
 						<LocalizedSlugPanel
 							postId={ postId }
 							languageCode={ languageCode }
+							refreshToken={ slugRefresh }
 						/>
 					) }
 
@@ -1128,6 +1202,8 @@ export default function App() {
 						onClearSelection={ () => setSelectedKeys( clearSelection() ) }
 						canReview={ canReview }
 						reviewSelectedCount={ reviewSelectedRows.length }
+						submitSelectedCount={ submitSelectedRows.length }
+						onSubmitSelected={ handleSubmitSelected }
 						onApproveSelected={ () =>
 							openReviewDialog(
 								reviewSelectedRows.map( ( row ) => row.segmentKey ),

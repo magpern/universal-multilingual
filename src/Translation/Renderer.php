@@ -100,6 +100,13 @@ final class Renderer {
 		add_filter( 'the_content', array( $this, 'filter_content' ), 1 );
 		add_filter( 'get_the_excerpt', array( $this, 'filter_excerpt' ), 10, 2 );
 		add_filter( 'document_title_parts', array( $this, 'filter_document_title' ), 20 );
+
+		// WooCommerce renders the product short description through its own
+		// filter on the raw post_excerpt, never get_the_excerpt(), so the
+		// generic excerpt overlay above misses it entirely. Priority 1 so the
+		// overlay sees the raw excerpt before WooCommerce's wpautop/wptexturize
+		// formatting filters (all priority 10+) transform it.
+		add_filter( 'woocommerce_short_description', array( $this, 'filter_woocommerce_short_description' ), 1, 1 );
 	}
 
 	/**
@@ -185,6 +192,37 @@ final class Renderer {
 		}
 
 		if ( ! $post instanceof WP_Post || '' === trim( (string) $post->post_excerpt ) ) {
+			return $excerpt;
+		}
+
+		$translated = $this->lookup( (int) $post->ID, Extractor::FIELD_EXCERPT );
+
+		return null === $translated ? $excerpt : $translated;
+	}
+
+	/**
+	 * Translates the WooCommerce product short description.
+	 *
+	 * WooCommerce echoes `apply_filters( 'woocommerce_short_description',
+	 * $post->post_excerpt )` from its single-product template — it does not go
+	 * through `get_the_excerpt`, so {@see self::filter_excerpt()} never sees it.
+	 * The stored translation is the same `post_excerpt` field overlay.
+	 *
+	 * @param mixed $excerpt Raw short description (post_excerpt).
+	 * @return mixed
+	 */
+	public function filter_woocommerce_short_description( $excerpt ) {
+		if ( ! is_string( $excerpt ) || ! $this->should_translate() ) {
+			return $excerpt;
+		}
+
+		$post = get_post();
+		if ( ! $post instanceof WP_Post || 'product' !== (string) $post->post_type ) {
+			return $excerpt;
+		}
+
+		// Only substitute the queried product's own stored short description.
+		if ( '' === trim( (string) $post->post_excerpt ) || $excerpt !== $post->post_excerpt ) {
 			return $excerpt;
 		}
 

@@ -477,9 +477,37 @@ final class WorkspaceService {
 	public function load_segments( WP_Post $post, int $language_id ): array {
 		$this->assert_supported_post( $post );
 
-		$segments = $this->assembler->assemble_for_post( $post, $language_id );
+		$segments = $this->without_slug_segment(
+			$this->assembler->assemble_for_post( $post, $language_id )
+		);
 
 		return $this->attach_meta( $segments, $language_id );
+	}
+
+	/**
+	 * Drops the localized URL slug (post_name / FORMAT_SLUG) from a segment set.
+	 *
+	 * The slug is never an AI translation segment — every AI and bulk path
+	 * already excludes it — and it has its own dedicated lifecycle
+	 * (SlugCandidateService, surfaced by the "Localized URL" section). Showing
+	 * it as an editable translation segment created a second, weaker write path
+	 * and misleading "empty translation" QA warnings on a field the AI flow
+	 * never touches.
+	 *
+	 * @param array<int, array<string, mixed>> $segments Assembled segment DTOs.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function without_slug_segment( array $segments ): array {
+		return array_values(
+			array_filter(
+				$segments,
+				static function ( array $segment ): bool {
+					return Store::FORMAT_SLUG !== (string) ( $segment['text_format'] ?? '' )
+						&& Extractor::FIELD_SLUG !== (string) ( $segment['segment_key'] ?? '' )
+						&& Extractor::FIELD_SLUG !== (string) ( $segment['field_key'] ?? '' );
+				}
+			)
+		);
 	}
 
 	/**
@@ -495,7 +523,7 @@ final class WorkspaceService {
 		return $this->page_status_for_segments(
 			$post,
 			$language_id,
-			$this->assembler->assemble_for_post( $post, $language_id )
+			$this->without_slug_segment( $this->assembler->assemble_for_post( $post, $language_id ) )
 		);
 	}
 
@@ -1000,7 +1028,7 @@ final class WorkspaceService {
 			return $row;
 		}
 
-		return $this->route_publication->sync_view( $post, $language_id );
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
 	}
 
 	/**
@@ -1021,7 +1049,7 @@ final class WorkspaceService {
 			return $row;
 		}
 
-		return $this->route_publication->sync_view( $post, $language_id );
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
 	}
 
 	/**
@@ -1041,7 +1069,7 @@ final class WorkspaceService {
 			return $row;
 		}
 
-		return $this->route_publication->sync_view( $post, $language_id );
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
 	}
 
 	/**
@@ -1058,7 +1086,12 @@ final class WorkspaceService {
 			return new WP_Error( 'aiml_slug_unavailable', __( 'Slug services are not available.', 'universal-multilingual' ), array( 'status' => 503 ) );
 		}
 
-		return $this->route_publication->publish_route( $post, $language_id, $user_id );
+		$result = $this->route_publication->publish_route( $post, $language_id, $user_id );
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
 	}
 
 	/**
@@ -1074,7 +1107,118 @@ final class WorkspaceService {
 			return new WP_Error( 'aiml_slug_unavailable', __( 'Slug services are not available.', 'universal-multilingual' ), array( 'status' => 503 ) );
 		}
 
-		return $this->route_publication->sync_view( $post, $language_id );
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
+	}
+
+	/**
+	 * Auto-generates the localized URL slug when it should follow the
+	 * translation, without ever touching a manually edited slug (MSEO.1
+	 * `SlugCandidateService::generate()` already refuses to overwrite `manual`).
+	 *
+	 * Called on Workspace load and after a "Translate with AI" job completes so
+	 * a normal user never has to press "Generate" to obtain the obvious
+	 * machine proposal. Idempotent — a `generated` candidate is refreshed only
+	 * when it no longer matches the current translated title.
+	 *
+	 * @param WP_Post $post        Post.
+	 * @param int     $language_id Language id.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function ensure_slug_candidate( WP_Post $post, int $language_id ) {
+		$this->assert_supported_post( $post );
+		if ( null === $this->slug_candidates || null === $this->route_publication ) {
+			return new WP_Error( 'aiml_slug_unavailable', __( 'Slug services are not available.', 'universal-multilingual' ), array( 'status' => 503 ) );
+		}
+
+		$title_row = $this->store->get( Store::SOURCE_POST, (int) $post->ID, $language_id, Extractor::FIELD_TITLE );
+		$title     = is_object( $title_row ) ? trim( (string) ( $title_row->translated_text ?? '' ) ) : '';
+		$title_ok  = '' !== $title && ( ! is_object( $title_row ) || Store::STATUS_MISSING !== (string) ( $title_row->status ?? '' ) );
+
+		$existing = $this->store->get( Store::SOURCE_POST, (int) $post->ID, $language_id, Extractor::FIELD_SLUG );
+		$origin   = is_object( $existing ) ? (string) ( $existing->slug_origin ?? '' ) : '';
+		$current  = is_object( $existing ) ? trim( (string) ( $existing->translated_text ?? '' ) ) : '';
+		$has_cand = is_object( $existing ) && '' !== $current && Store::STATUS_MISSING !== (string) ( $existing->status ?? '' );
+
+		if ( $title_ok && 'manual' !== $origin ) {
+			$want = $this->slug_candidates->normalize_generated( $title );
+			if ( '' !== $want && ( ! $has_cand || ( 'generated' === $origin && $want !== $current ) ) ) {
+				$generated = $this->slug_candidates->generate( $post, $language_id );
+				if ( $generated instanceof WP_Error && 'aiml_slug_manual_locked' !== $generated->get_error_code() ) {
+					return $generated;
+				}
+			}
+		}
+
+		return $this->enrich_slug_view( $post, $language_id, $this->route_publication->sync_view( $post, $language_id ) );
+	}
+
+	/**
+	 * Adds plain-language presentation facts to a raw slug/route sync view.
+	 *
+	 * @param WP_Post              $post        Post.
+	 * @param int                  $language_id Language id.
+	 * @param array<string, mixed> $view        Raw sync_view.
+	 * @return array<string, mixed>
+	 */
+	private function enrich_slug_view( WP_Post $post, int $language_id, array $view ): array {
+		$language       = $this->languages->find( $language_id );
+		$code           = null !== $language ? (string) ( $language->code ?? '' ) : '';
+		$language_name  = null !== $language ? (string) ( $language->name ?? '' ) : '';
+		$lang_published = null !== $language && Languages::STATUS_PUBLISHED === (string) ( $language->status ?? '' );
+
+		$title_row = $this->store->get( Store::SOURCE_POST, (int) $post->ID, $language_id, Extractor::FIELD_TITLE );
+		$title     = is_object( $title_row ) ? trim( (string) ( $title_row->translated_text ?? '' ) ) : '';
+
+		$candidate = (string) ( $view['slug_candidate'] ?? '' );
+		$origin    = (string) ( $view['slug_origin'] ?? '' );
+		$has_cand  = '' !== $candidate;
+
+		$title_stale = false;
+		if ( 'generated' === $origin && '' !== $title && null !== $this->slug_candidates ) {
+			$title_stale = $this->slug_candidates->normalize_generated( $title ) !== $candidate;
+		}
+
+		$leaf = $candidate;
+		if ( '' === $leaf ) {
+			$leaf = (string) ( $view['active_route_slug'] ?? '' );
+		}
+		if ( '' === $leaf ) {
+			$leaf = (string) $post->post_name;
+		}
+		$path          = trim( (string) ( $view['localized_path'] ?? '' ), '/' );
+		$rel           = '/' . trim( $code, '/' ) . '/' . ( '' !== $path ? $path : $leaf ) . '/';
+		$absolute      = (bool) ( $view['route_prepared'] ?? false ) && $lang_published;
+		$localized_url = $absolute
+			? rtrim( (string) home_url( $rel ), '/' ) . '/'
+			: $rel;
+
+		if ( ! $has_cand && '' === $title ) {
+			$state = 'no_translation';
+		} elseif ( (bool) ( $view['route_prepared'] ?? false ) && $lang_published ) {
+			$state = (bool) ( $view['collision_adjusted'] ?? false ) ? 'url_conflict' : 'published';
+		} elseif ( ! $has_cand ) {
+			$state = 'no_url';
+		} elseif ( (bool) ( $view['can_publish_route'] ?? false ) ) {
+			$state = 'ready_to_publish';
+		} elseif ( ! $lang_published ) {
+			$state = 'ready_when_language_published';
+		} else {
+			$state = 'needs_attention';
+		}
+
+		return array_merge(
+			$view,
+			array(
+				'language_code'          => $code,
+				'language_name'          => $language_name,
+				'language_published'     => $lang_published,
+				'translated_title'       => $title,
+				'title_slug_stale'       => $title_stale,
+				'localized_url'          => $localized_url,
+				'localized_url_absolute' => $absolute,
+				'state'                  => $state,
+			)
+		);
 	}
 
 	/**

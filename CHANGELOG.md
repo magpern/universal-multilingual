@@ -5,6 +5,49 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-09-10
+
+### Added
+
+- **Localized URL as part of translation.** `WorkspaceService::ensure_slug_candidate()`
+  (REST `POST aiml/v1/workspace/<id>/slug/ensure`) auto-generates the localized
+  slug from the translated title on Workspace load and after a "Translate with
+  AI" job completes — a normal user no longer presses "Generate". It never
+  touches a `manual` slug (`SlugCandidateService::generate()` already refuses),
+  and a `generated` slug is refreshed only when it no longer matches the title.
+- The `LocalizedSlugPanel` is redesigned: a plain **URL for <language>** with an
+  **Edit** action and a plain state — *Ready when <language> is published* /
+  *Ready to publish* (with a **Publish URL** button) / *Published* / *URL
+  conflict*. The technical controls (Regenerate, Clear, Publish route, Refresh,
+  origin / sync / route detail) move under **Advanced URL controls**.
+  `sync_view` gains `localized_url`, `translated_title`, `title_slug_stale`,
+  `state`, `language_code`, `language_published`.
+- **Submit selected for review** — a bulk action in the Workspace toolbar. The
+  `batch-review` endpoint already supported `action=submit`; only the button was
+  missing.
+- The Workspace notes that **Preview** opens the translated page for signed-in
+  editors only while the target language is not yet published.
+
+### Changed
+
+- The localized URL slug (`post_name`) is no longer returned as an editable
+  translation segment by `WorkspaceService::load_segments()` /
+  `page_status()`. Every AI and bulk path already excluded it and it has its own
+  lifecycle; showing it created a second write path and misleading QA warnings.
+  `Extractor::extract()` still emits it (the slug candidate needs its
+  `source_text`).
+- **"Accept TM exact"** → **"Apply exact memory matches"**, with an
+  explanatory tooltip.
+
+### Fixed
+
+- **WooCommerce product short descriptions are now translated on the
+  storefront.** WooCommerce echoes `apply_filters( 'woocommerce_short_description',
+  $post->post_excerpt )` from its single-product template — never
+  `get_the_excerpt` — so the overlay never saw it. `Renderer` now filters
+  `woocommerce_short_description` at priority 1 (before WooCommerce's own
+  `wpautop` / `wptexturize`).
+
 ## [1.15.2] - 2026-09-10
 
 ### Fixed

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace AIMultilingual\Tests\Integration;
 
 use AIMultilingual\Rest\WorkspaceController;
+use AIMultilingual\Translation\Extractor;
 use AIMultilingual\Translation\Store;
 use WP_REST_Request;
 
@@ -114,6 +115,94 @@ final class WorkspaceRestTest extends AimlTestCase {
 		$response = rest_do_request( $request );
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertNotEmpty( $response->get_data()['items'] );
+	}
+
+	public function test_segment_list_excludes_the_localized_url_slug(): void {
+		$this->add_language();
+		$post = $this->create_page( 'About Us' );
+		wp_set_current_user( $this->create_translator() );
+
+		$load = new WP_REST_Request( 'GET', '/aiml/v1/workspace/' . (int) $post->ID . '/segments' );
+		$load->set_param( 'language', 'sv' );
+		$segments = rest_do_request( $load )->get_data()['segments'];
+
+		foreach ( $segments as $segment ) {
+			$this->assertNotSame( Store::FORMAT_SLUG, (string) ( $segment['text_format'] ?? '' ) );
+			$this->assertNotSame( Extractor::FIELD_SLUG, (string) ( $segment['segment_key'] ?? '' ) );
+			$this->assertNotSame( Extractor::FIELD_SLUG, (string) ( $segment['field_key'] ?? '' ) );
+		}
+	}
+
+	public function test_ensure_slug_candidate_generates_from_translated_title(): void {
+		$language = $this->add_language();
+		$post     = $this->create_page( 'About Us' );
+		wp_set_current_user( $this->create_translator() );
+
+		$this->store->save_translation(
+			array(
+				'source_type'     => Store::SOURCE_POST,
+				'source_id'       => (int) $post->ID,
+				'source_subtype'  => 'page',
+				'language_id'     => (int) $language->language_id,
+				'field_key'       => Extractor::FIELD_TITLE,
+				'segment_key'     => Extractor::FIELD_TITLE,
+				'segment_kind'    => Store::KIND_FIELD,
+				'text_format'     => Store::FORMAT_PLAIN,
+				'source_text'     => 'About Us',
+				'translated_text' => 'Om oss',
+				'status'          => Store::STATUS_MACHINE_TRANSLATED,
+			)
+		);
+
+		$ensure = new WP_REST_Request( 'POST', '/aiml/v1/workspace/' . (int) $post->ID . '/slug/ensure' );
+		$ensure->set_param( 'language', 'sv' );
+		$view = rest_do_request( $ensure )->get_data();
+
+		$this->assertSame( 'om-oss', $view['slug_candidate'] );
+		$this->assertSame( 'generated', $view['slug_origin'] );
+		$this->assertArrayHasKey( 'state', $view );
+		$this->assertArrayHasKey( 'localized_url', $view );
+
+		// Idempotent: a second ensure with the same title changes nothing.
+		$again = rest_do_request( $ensure )->get_data();
+		$this->assertSame( 'om-oss', $again['slug_candidate'] );
+		$this->assertSame( 'generated', $again['slug_origin'] );
+	}
+
+	public function test_ensure_never_overwrites_a_manual_slug(): void {
+		$language = $this->add_language();
+		$post     = $this->create_page( 'About Us' );
+		wp_set_current_user( $this->create_translator() );
+
+		$this->store->save_translation(
+			array(
+				'source_type'     => Store::SOURCE_POST,
+				'source_id'       => (int) $post->ID,
+				'source_subtype'  => 'page',
+				'language_id'     => (int) $language->language_id,
+				'field_key'       => Extractor::FIELD_TITLE,
+				'segment_key'     => Extractor::FIELD_TITLE,
+				'segment_kind'    => Store::KIND_FIELD,
+				'text_format'     => Store::FORMAT_PLAIN,
+				'source_text'     => 'About Us',
+				'translated_text' => 'Om oss',
+				'status'          => Store::STATUS_MACHINE_TRANSLATED,
+			)
+		);
+
+		$save = new WP_REST_Request( 'POST', '/aiml/v1/workspace/' . (int) $post->ID . '/slug' );
+		$save->set_query_params( array( 'language' => 'sv' ) );
+		$save->set_body_params( array( 'slug_candidate' => 'min-egen-url' ) );
+		$saved = rest_do_request( $save );
+		$this->assertSame( 200, $saved->get_status(), wp_json_encode( $saved->get_data() ) );
+		$this->assertSame( 'manual', $saved->get_data()['slug_origin'] );
+
+		$ensure = new WP_REST_Request( 'POST', '/aiml/v1/workspace/' . (int) $post->ID . '/slug/ensure' );
+		$ensure->set_param( 'language', 'sv' );
+		$view = rest_do_request( $ensure )->get_data();
+
+		$this->assertSame( 'min-egen-url', $view['slug_candidate'] );
+		$this->assertSame( 'manual', $view['slug_origin'] );
 	}
 
 	public function test_untranslated_segments_carry_no_qa_noise(): void {

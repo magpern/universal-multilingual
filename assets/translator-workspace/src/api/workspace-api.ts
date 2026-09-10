@@ -160,6 +160,15 @@ export interface SlugRouteView {
 	can_edit_slug: boolean;
 	can_publish_route: boolean;
 	route_publication_blocked_reason: string;
+	// Presentation facts added by WorkspaceService::enrich_slug_view().
+	language_code?: string;
+	language_name?: string;
+	language_published?: boolean;
+	translated_title?: string;
+	title_slug_stale?: boolean;
+	localized_url?: string;
+	localized_url_absolute?: boolean;
+	state?: string;
 	status?: string;
 	idempotent?: boolean;
 }
@@ -192,6 +201,22 @@ export async function generateSlugCandidate(
 		return await apiFetch<SlugRouteView>( {
 			path:
 				slugPath( postId, '/generate' ) +
+				`?language=${ encodeURIComponent( language ) }`,
+			method: 'POST',
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
+}
+
+export async function ensureSlugCandidate(
+	postId: number,
+	language: string
+): Promise<SlugRouteView> {
+	try {
+		return await apiFetch<SlugRouteView>( {
+			path:
+				slugPath( postId, '/ensure' ) +
 				`?language=${ encodeURIComponent( language ) }`,
 			method: 'POST',
 		} );

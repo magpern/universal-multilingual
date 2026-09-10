@@ -191,6 +191,10 @@ export function jobTypeOptions(): Array< { value: JobType; label: string } > {
 			label: jobTypeLabel( 'retranslate_stale' ),
 		},
 		{
+			value: 'retranslate_machine',
+			label: jobTypeLabel( 'retranslate_machine' ),
+		},
+		{
 			value: 'bulk_translate',
 			label: jobTypeLabel( 'bulk_translate' ),
 		},

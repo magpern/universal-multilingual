@@ -371,6 +371,17 @@ final class BackgroundTranslationWorker {
 			return is_wp_error( $final ) ? $final : $final;
 		}
 
+		// This bounded wake hit MAX_ITEMS_PER_WAKE with claimable items still
+		// pending. Schedule the next wake so one user action ("Translate with
+		// AI" autostart, or a single Run) drives the job to completion instead
+		// of stalling until the hourly sweep. Retry-waiting items already
+		// schedule their own delayed wake in record_item_result(); the
+		// $processed guard keeps a zero-progress wake (e.g. only not-yet-due
+		// retry_wait items remain) from re-arming immediately.
+		if ( $processed > 0 && null !== $this->scheduler ) {
+			$this->scheduler->enqueue_job( $job_id );
+		}
+
 		return $this->job_repo->find( $job_id ) ?? $fresh;
 	}
 

@@ -16,8 +16,14 @@ import {
 	publishSiteTranslateRoutes,
 	runSiteTranslateBatch,
 } from '../api/site-translate-api';
+import LanguageChecklist from './LanguageChecklist';
 import LanguageSelect from './LanguageSelect';
 import { aiTranslateModeOptions } from '../utils/jobs';
+import {
+	defaultSelection,
+	normalizeSelection,
+	operationCount,
+} from '../utils/multi-language-selection';
 import type { AiTranslateMode } from '../types/jobs';
 import type { LanguageOption } from '../types/view-models';
 import type {
@@ -82,12 +88,32 @@ export default function SiteTranslatePanel( {
 				raw
 					.split( ',' )
 					.map( ( value ) => Number.parseInt( value, 10 ) )
-					.filter( ( value ) => Number.isInteger( value ) && value > 0 )
+					.filter(
+						( value ) => Number.isInteger( value ) && value > 0
+					)
 			);
 		} catch ( e ) {
 			return new Set();
 		}
 	} );
+	// MLW1a (WP7): the objects list still browses one language; the CREATE
+	// action targets this checklist of languages (N objects × M languages).
+	const [ selectedLanguageCodes, setSelectedLanguageCodes ] = useState<
+		string[]
+	>( () => {
+		try {
+			const raw = new URLSearchParams( window.location.search ).get(
+				'aiml_st_langs'
+			);
+			if ( raw ) {
+				return normalizeSelection( raw.split( ',' ), languages );
+			}
+		} catch ( e ) {
+			// fall through to the default
+		}
+		return defaultSelection( languages );
+	} );
+	const [ acknowledgePublished, setAcknowledgePublished ] = useState( false );
 	const [ mode, setMode ] = useState< AiTranslateMode >( 'missing' );
 	const [ batchId, setBatchId ] = useState( '' );
 	const [ clientToken, setClientToken ] = useState( () => newClientToken() );
@@ -100,7 +126,8 @@ export default function SiteTranslatePanel( {
 	>( [] );
 
 	const language = useMemo(
-		() => languages.find( ( candidate ) => candidate.code === languageCode ),
+		() =>
+			languages.find( ( candidate ) => candidate.code === languageCode ),
 		[ languageCode, languages ]
 	);
 	const languageId = language?.language_id ?? 0;
@@ -117,6 +144,50 @@ export default function SiteTranslatePanel( {
 		() => Array.from( selected ).filter( ( id ) => id > 0 ),
 		[ selected ]
 	);
+
+	const selectedLanguageIds = useMemo(
+		() =>
+			selectedLanguageCodes
+				.map(
+					( code ) =>
+						languages.find( ( l ) => l.code === code )
+							?.language_id ?? 0
+				)
+				.filter( ( id ) => id > 0 ),
+		[ selectedLanguageCodes, languages ]
+	);
+	const publishedSelected = useMemo(
+		() =>
+			languages
+				.filter(
+					( l ) =>
+						selectedLanguageCodes.includes( l.code ) &&
+						l.status === 'published'
+				)
+				.map( ( l ) => l.native_name || l.name || l.code ),
+		[ languages, selectedLanguageCodes ]
+	);
+	const operations = operationCount(
+		selectedIds.length,
+		selectedLanguageIds.length
+	);
+
+	useEffect( () => {
+		try {
+			const url = new URL( window.location.href );
+			if ( selectedLanguageCodes.length > 0 ) {
+				url.searchParams.set(
+					'aiml_st_langs',
+					selectedLanguageCodes.join( ',' )
+				);
+			} else {
+				url.searchParams.delete( 'aiml_st_langs' );
+			}
+			window.history.replaceState( {}, '', url.toString() );
+		} catch ( e ) {
+			// URL persistence is best-effort.
+		}
+	}, [ selectedLanguageCodes ] );
 
 	const allVisibleSelected = useMemo(
 		() =>
@@ -195,7 +266,25 @@ export default function SiteTranslatePanel( {
 	};
 
 	const handleCreateJobs = async () => {
-		if ( ! canManageJobs || languageId <= 0 || 0 === selectedIds.length ) {
+		if (
+			! canManageJobs ||
+			0 === selectedIds.length ||
+			0 === selectedLanguageIds.length
+		) {
+			return;
+		}
+
+		if ( publishedSelected.length > 0 && ! acknowledgePublished ) {
+			setError(
+				sprintf(
+					/* translators: %s: comma-separated language names */
+					__(
+						'%s already published. Tick the acknowledgement to continue — new translations for these languages may become visible to visitors immediately.',
+						'ai-multilingual'
+					),
+					publishedSelected.join( ', ' )
+				)
+			);
 			return;
 		}
 
@@ -211,7 +300,9 @@ export default function SiteTranslatePanel( {
 				)?.bulkJobType ?? 'bulk_translate';
 			const response = await createSiteTranslateJobs( {
 				postIds: selectedIds,
-				languageId,
+				languageIds: selectedLanguageIds,
+				acknowledgePublished:
+					publishedSelected.length > 0 ? true : undefined,
 				clientToken,
 				jobType: bulkJobType,
 				autostart: true,
@@ -367,6 +458,16 @@ export default function SiteTranslatePanel( {
 				</Notice>
 			) }
 
+			<LanguageChecklist
+				languages={ languages }
+				selected={ selectedLanguageCodes }
+				onChange={ setSelectedLanguageCodes }
+				legend={ __(
+					'Target languages for this run',
+					'ai-multilingual'
+				) }
+			/>
+
 			<div className="aiml-site-translate-toolbar">
 				<LanguageSelect
 					languages={ languages }
@@ -382,9 +483,18 @@ export default function SiteTranslatePanel( {
 					label={ __( 'Post type', 'ai-multilingual' ) }
 					value={ postType }
 					options={ [
-						{ label: __( 'All types', 'ai-multilingual' ), value: '' },
-						{ label: __( 'Pages', 'ai-multilingual' ), value: 'page' },
-						{ label: __( 'Posts', 'ai-multilingual' ), value: 'post' },
+						{
+							label: __( 'All types', 'ai-multilingual' ),
+							value: '',
+						},
+						{
+							label: __( 'Pages', 'ai-multilingual' ),
+							value: 'page',
+						},
+						{
+							label: __( 'Posts', 'ai-multilingual' ),
+							value: 'post',
+						},
 						{
 							label: __( 'Products', 'ai-multilingual' ),
 							value: 'product',
@@ -397,9 +507,47 @@ export default function SiteTranslatePanel( {
 					value={ coverageFilter }
 					options={ coverageFilterOptions() }
 					onChange={ ( value ) =>
-						setCoverageFilter( value as SiteTranslateCoverageFilter )
+						setCoverageFilter(
+							value as SiteTranslateCoverageFilter
+						)
 					}
 				/>
+			</div>
+
+			<div className="aiml-site-translate-prerun">
+				<p className="aiml-site-translate-prerun__count">
+					{ sprintf(
+						/* translators: 1: object count, 2: language count, 3: total operations */
+						__(
+							'%1$d pages × %2$d languages = %3$d translations',
+							'ai-multilingual'
+						),
+						selectedIds.length,
+						selectedLanguageIds.length,
+						operations
+					) }
+				</p>
+				{ publishedSelected.length > 0 && (
+					<Notice status="warning" isDismissible={ false }>
+						{ sprintf(
+							/* translators: %s: comma-separated language names */
+							__(
+								"%s already published. New translations created for these languages may become visible to visitors immediately under the site's existing publication policy.",
+								'ai-multilingual'
+							),
+							publishedSelected.join( ', ' )
+						) }
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							label={ __(
+								'I understand and want to continue',
+								'ai-multilingual'
+							) }
+							checked={ acknowledgePublished }
+							onChange={ setAcknowledgePublished }
+						/>
+					</Notice>
+				) }
 			</div>
 
 			<div className="aiml-site-translate-actions aiml-ui-actionbar">
@@ -407,7 +555,12 @@ export default function SiteTranslatePanel( {
 					className="aiml-ui-actionbar__primary"
 					variant="primary"
 					disabled={
-						! canManageJobs || createBusy || 0 === selectedIds.length
+						! canManageJobs ||
+						createBusy ||
+						0 === selectedIds.length ||
+						0 === selectedLanguageIds.length ||
+						( publishedSelected.length > 0 &&
+							! acknowledgePublished )
 					}
 					isBusy={ createBusy }
 					onClick={ () => void handleCreateJobs() }
@@ -429,10 +582,12 @@ export default function SiteTranslatePanel( {
 						onChange={ ( value ) =>
 							setMode( value as AiTranslateMode )
 						}
-						options={ aiTranslateModeOptions().map( ( option ) => ( {
-							value: option.value,
-							label: option.label,
-						} ) ) }
+						options={ aiTranslateModeOptions().map(
+							( option ) => ( {
+								value: option.value,
+								label: option.label,
+							} )
+						) }
 					/>
 				</div>
 				<p className="aiml-ui-actionbar__hint">
@@ -476,7 +631,10 @@ export default function SiteTranslatePanel( {
 						<tr>
 							<th>
 								<CheckboxControl
-									label={ __( 'Select all visible', 'ai-multilingual' ) }
+									label={ __(
+										'Select all visible',
+										'ai-multilingual'
+									) }
 									checked={ allVisibleSelected }
 									onChange={ toggleAllVisible }
 								/>
@@ -504,7 +662,10 @@ export default function SiteTranslatePanel( {
 									<CheckboxControl
 										label={ sprintf(
 											/* translators: %s: post title */
-											__( 'Select %s', 'ai-multilingual' ),
+											__(
+												'Select %s',
+												'ai-multilingual'
+											),
 											row.post_title
 										) }
 										checked={ selected.has( row.post_id ) }
@@ -515,7 +676,9 @@ export default function SiteTranslatePanel( {
 								</td>
 								<td>{ row.post_title }</td>
 								<td>{ row.post_type }</td>
-								<td>{ coverageSummaryLabel( row.coverage ) }</td>
+								<td>
+									{ coverageSummaryLabel( row.coverage ) }
+								</td>
 								<td>
 									{ row.coverage.blocked_or_unsupported.map(
 										( reason ) => (
@@ -538,7 +701,9 @@ export default function SiteTranslatePanel( {
 				<Button
 					variant="secondary"
 					disabled={ page <= 1 || loading }
-					onClick={ () => setPage( ( current ) => Math.max( 1, current - 1 ) ) }
+					onClick={ () =>
+						setPage( ( current ) => Math.max( 1, current - 1 ) )
+					}
 				>
 					{ __( 'Previous', 'ai-multilingual' ) }
 				</Button>
@@ -554,7 +719,9 @@ export default function SiteTranslatePanel( {
 					variant="secondary"
 					disabled={ page >= totalPages || loading }
 					onClick={ () =>
-						setPage( ( current ) => Math.min( totalPages, current + 1 ) )
+						setPage( ( current ) =>
+							Math.min( totalPages, current + 1 )
+						)
 					}
 				>
 					{ __( 'Next', 'ai-multilingual' ) }
@@ -563,14 +730,23 @@ export default function SiteTranslatePanel( {
 
 			{ routeOutcomes.length > 0 && (
 				<div className="aiml-site-translate-routes">
-					<h3>{ __( 'Localized URL outcomes', 'ai-multilingual' ) }</h3>
+					<h3>
+						{ __( 'Localized URL outcomes', 'ai-multilingual' ) }
+					</h3>
 					<ul>
 						{ routeOutcomes.map( ( outcome ) => (
-							<li key={ `${ outcome.post_id }-${ outcome.outcome }` }>
-								<strong>{ routeOutcomeLabel( outcome.outcome ) }</strong>
+							<li
+								key={ `${ outcome.post_id }-${ outcome.outcome }` }
+							>
+								<strong>
+									{ routeOutcomeLabel( outcome.outcome ) }
+								</strong>
 								{ ': ' }
 								{ outcome.message }
-								{ ' (#'.concat( String( outcome.post_id ), ')' ) }
+								{ ' (#'.concat(
+									String( outcome.post_id ),
+									')'
+								) }
 							</li>
 						) ) }
 					</ul>

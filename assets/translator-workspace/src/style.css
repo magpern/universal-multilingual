@@ -1002,3 +1002,14 @@
 	font-weight: 600;
 	margin: 0.5rem 0;
 }
+
+/* MLW1a — Site Translate N×M pre-run strip (WP7). */
+
+.aiml-translator-workspace .aiml-site-translate-prerun {
+	margin: 0.75rem 0;
+}
+
+.aiml-translator-workspace .aiml-site-translate-prerun__count {
+	font-weight: 600;
+	margin: 0 0 0.5rem;
+}

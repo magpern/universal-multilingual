@@ -92,7 +92,11 @@ export async function checkSiteTranslateAdmission(
 
 export async function createSiteTranslateJobs( payload: {
 	postIds: number[];
-	languageId: number;
+	/** One target language (legacy scalar). */
+	languageId?: number;
+	/** MLW1a — N objects × M languages matrix. */
+	languageIds?: number[];
+	acknowledgePublished?: boolean;
 	clientToken?: string;
 	batchId?: string;
 	providerId?: string;
@@ -106,6 +110,8 @@ export async function createSiteTranslateJobs( payload: {
 			data: {
 				post_ids: payload.postIds,
 				language_id: payload.languageId,
+				language_ids: payload.languageIds,
+				acknowledge_published: payload.acknowledgePublished,
 				client_token: payload.clientToken,
 				batch_id: payload.batchId,
 				provider_id: payload.providerId,

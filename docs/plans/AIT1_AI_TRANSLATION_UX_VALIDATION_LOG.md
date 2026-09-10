@@ -146,10 +146,38 @@ outstanding acceptance step.
 settings-configured provider again; `home_url('/')` → HTTP 200. Throwaway admin
 user deleted.
 
+## Post-release PO acceptance on DEV (real provider)
+
+- **v1.15.0** released (tag `v1.15.0`, commit `5344fc011`).
+- PO manual acceptance on DEV then exposed a real defect: a "Translate with AI"
+  job on any object with **> `MAX_ITEMS_PER_WAKE` (10)** segments translated the
+  first 10 and then stalled — `BackgroundTranslationWorker::process_items()`
+  returned without scheduling the next wake, and the hourly sweep only recovers
+  crashed jobs. Fixed and shipped as **v1.15.1** (tag `v1.15.1`, merge
+  `05da9da73`); regression test
+  `JobsWorkerTest::test_worker_reschedules_next_wake_when_claimable_items_remain`.
+- The acceptance **fake provider** (`[locale] source`) made the earlier DEV
+  acceptance misleading — output looked "translated" but was English with a
+  marker. For real acceptance the fake MU-plugin was disabled and DEV switched
+  to the **real OpenAI `gpt-5-mini`** provider already configured in Settings.
+- **`tools/live-provider-check.php`** — a real-provider acceptance script (not
+  in CI; costs provider calls): one real `translate_missing` job, asserts each
+  prose segment's target is non-empty, differs from source, and is not the
+  `[locale] source` fake shape. Run on DEV 2026-09-10 → **ALL PASS**
+  (e.g. *"The peptide is studied for its role in neuroendocrine pathways…"* →
+  *"Peptiden studeras för sin roll i neuroendokrina signalvägar…"*).
+- **`tests/integration/LiveOpenAiTranslationTest.php`** — committed opt-in test,
+  `@group external-http`, skipped unless `AIML_LIVE_OPENAI_API_KEY` is set;
+  asserts the live OpenAI output is a genuine translation.
+
 ## Outstanding
 
+- **`post_name` (URL slug)** appears in the Workspace segment list and, after an
+  AI translate, still shows `empty_translation` + `qd9_number_corruption`
+  warnings — `translate_missing` deliberately does not AI-translate slugs (that
+  is the separate Localized URLs feature). The QA noise on slug/identifier
+  segments is misleading and should be suppressed. Not yet fixed.
+- PO asked for a rendered page preview in place of the segment list — UX
+  redesign, tracked separately, out of AIT1 scope.
 - Host-side re-run of `languages-admin-browser` / `f10-browser` / `jobs` /
-  `a3-elementor`.
-- `11b` browser retry-to-completion.
-- WP11 release actions (version bump to v1.15.0, tag, GitHub release, bucket
-  publish) — deferred; not authorized.
+  `a3-elementor`; `11b` browser retry-to-completion.

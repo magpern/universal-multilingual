@@ -22,13 +22,15 @@ host Node 22 + `wp-scripts` (workspace build + Jest),
 | WP9 | `7265ef524` | `aiml_ai_provider` filter seam |
 | — | `180ba0235` | Workspace honours `?view=site-translate` |
 | WP10 | `c173f67d3` | `acceptance/ai-translation-browser/` suite + fake-provider MU-plugin + phpcs fixes |
+| — | `d8e88645d` / `81df7a49a` | validation-log evidence |
+| nav | `b4c17f525` | shared internal admin navigation (`.aiml-ui-subnav`) across all 8 UM admin screens |
 
 ## Local gate results
 
 | Gate | Baseline | Head | Command |
 |------|----------|------|---------|
-| PHP unit | 1047 pass / 2 skip | **1064 pass / 2 skip** | `phpunit -c phpunit.xml.dist` |
-| PHP integration | 1027 pass / 3 skip | **1048 pass / 3 skip** | `phpunit -c phpunit-integration.xml.dist` |
+| PHP unit | 1047 pass / 2 skip | **1073 pass / 2 skip** | `phpunit -c phpunit.xml.dist` |
+| PHP integration | 1027 pass / 3 skip | **1055 pass / 3 skip** | `phpunit -c phpunit-integration.xml.dist` |
 | PHPCS (errors + warnings) | clean | **clean** | `vendor/bin/phpcs` |
 | Workspace Jest | 108 pass / 2 pre-existing fail | **110 pass** (the pre-existing `jobs-url` drift also fixed) | `wp-scripts test-unit-js` |
 | Workspace build | ok | **ok** | `wp-scripts build` |
@@ -36,9 +38,10 @@ host Node 22 + `wp-scripts` (workspace build + Jest),
 | build zip + audit zip | ok | **ok** | `bin/build-zip.sh` + `bin/audit-zip.sh` (clean `--no-dev` checkout) |
 
 New tests: `TranslatableSegmentEligibilityTest`, `PluginActionLinksTest`,
-`ProviderFrameworkTest::is_ai_configured_*` + `::aiml_ai_provider_filter_*` (unit);
-`AitSharedEligibilityTest`, `PageAiTranslateJobTest`, `BatchAiTranslateModeTest`,
-`AitAdminEntrypointsTest`, `ElementorAiTranslationRoundtripTest` (integration);
+`AdminNavigationTest`, `ProviderFrameworkTest::is_ai_configured_*` +
+`::aiml_ai_provider_filter_*` (unit); `AitSharedEligibilityTest`,
+`PageAiTranslateJobTest`, `BatchAiTranslateModeTest`, `AitAdminEntrypointsTest`,
+`AitAdminNavigationTest`, `ElementorAiTranslationRoundtripTest` (integration);
 `PluginGuardTest` P2 job-type boundary updated for AIT1.
 
 ### Pre-existing `tsc --noEmit` errors (AIT1 does not worsen)

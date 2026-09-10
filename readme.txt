@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.15.1
+Stable tag: 1.15.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,10 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.15.2 =
+* Fix: the Translator Workspace no longer shows "Quality checks" warnings (empty_translation, number, HTML-tag) on segments that have not been translated yet. An absent translation has no translation quality to report and the Status column already shows "Missing"; the noise was especially visible on fields the AI flow does not translate, such as the URL slug (post_name). Quality checks still run in full on the save and review paths.
+* No database migration. Schema stays at version 10; settings shape stays at 3.
 
 = 1.15.1 =
 * Fix: a background translation job created by "Translate with AI" (or "Translate selected with AI") now runs to completion. The worker processes segments in bounded wakes of 10; when more segments remained it stopped without scheduling the next wake, so a page with more than 10 translatable segments only translated the first 10 and then stalled. The worker now re-arms its own next wake while work remains.

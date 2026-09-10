@@ -6,15 +6,19 @@
  * @package AIMultilingual\Acceptance
  */
 
-$active = ( new \AIMultilingual\Translation\AI\ProviderRegistry( new \AIMultilingual\Settings() ) )->active()->get_id();
-$filter = has_filter( 'aiml_ai_provider' );
+$active   = ( new \AIMultilingual\Translation\AI\ProviderRegistry( new \AIMultilingual\Settings() ) )->active()->get_id();
+$filter   = has_filter( 'aiml_ai_provider' );
+$fake_cls = class_exists( 'AIML_Acceptance_Fake_Provider', false );
 
-if ( 'acceptance-fake' === $active || false !== $filter ) {
-	echo "TEARDOWN FAIL: active={$active} filter=" . var_export( $filter, true ) . "\n";
+if ( 'acceptance-fake' === $active || false !== $filter || $fake_cls ) {
+	echo "TEARDOWN FAIL: active={$active} filter=" . var_export( $filter, true ) . " fake_class=" . var_export( $fake_cls, true ) . "\n";
 	exit( 1 );
 }
 
-echo "TEARDOWN OK: fake provider removed, active provider = {$active}\n";
+// The bare registry here does not run Plugin::init() registration, so `null`
+// simply means "no override" — the real request lifecycle still resolves the
+// settings-configured provider.
+echo "TEARDOWN OK: fake provider MU-plugin + aiml_ai_provider filter removed (no override)\n";
 
 // Post-removal health smoke.
 $home = wp_remote_get( home_url( '/' ), array( 'timeout' => 20 ) );

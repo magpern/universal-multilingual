@@ -30,6 +30,7 @@ use AIMultilingual\Workspace\Operator\OperatorTranslationAssembler;
 use AIMultilingual\Workspace\QA\QAEngine;
 use AIMultilingual\Workspace\QA\QAIssue;
 use AIMultilingual\Workspace\QA\QAResult;
+use AIMultilingual\Workspace\Review\ObjectReviewSummary;
 use AIMultilingual\Workspace\Review\ReviewBatchCoordinator;
 use AIMultilingual\Workspace\Review\ReviewDiagnosticsCounters;
 use AIMultilingual\Workspace\Review\ReviewWorkflowException;
@@ -1384,6 +1385,189 @@ final class WorkspaceService {
 				'per_page'      => (int) ( $args['per_page'] ?? 20 ),
 			)
 		);
+	}
+
+	/**
+	 * Review queue grouped by content object + language (RVQ1).
+	 *
+	 * Wraps {@see review_queue()} — same Store rows, same pagination — and adds,
+	 * per distinct object on the page: a human title/type, reviewer-friendly
+	 * field labels, and a completeness-aware {@see ObjectReviewSummary} (which
+	 * is global to the object + language, not limited to the current page).
+	 *
+	 * @param array<string, mixed> $args Query args (see review_queue()).
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function review_queue_grouped( array $args ) {
+		$result = $this->review_queue( $args );
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		$resolver = new FieldLabelResolver();
+		$groups   = array();
+		$order    = array();
+
+		foreach ( $result['items'] as $row ) {
+			$post_id     = (int) ( $row->source_id ?? 0 );
+			$language_id = (int) ( $row->language_id ?? 0 );
+			$group_key   = $post_id . ':' . $language_id;
+			$post        = $post_id > 0 ? get_post( $post_id ) : null;
+			$post_type   = $post instanceof WP_Post ? (string) $post->post_type : '';
+
+			if ( ! isset( $groups[ $group_key ] ) ) {
+				$order[]              = $group_key;
+				$language             = $this->languages->find( $language_id );
+				$summary              = $post instanceof WP_Post
+					? $this->object_review_summary( $post, $language_id )->to_array()
+					: ( new ObjectReviewSummary( 0, 0, 0, 0, 0, 0, 0 ) )->to_array();
+				$groups[ $group_key ] = array(
+					'post_id'       => $post_id,
+					'post_title'    => $post instanceof WP_Post ? (string) $post->post_title : (string) $post_id,
+					'post_type'     => $post_type,
+					'object_noun'   => $resolver->object_noun( $post_type ),
+					'post_status'   => $post instanceof WP_Post ? (string) $post->post_status : '',
+					'language_id'   => $language_id,
+					'language_code' => null !== $language ? (string) ( $language->code ?? '' ) : '',
+					'language_name' => null !== $language ? (string) ( $language->name ?? '' ) : '',
+					'edit_link'     => $post_id > 0 ? (string) get_edit_post_link( $post_id, 'raw' ) : '',
+					'summary'       => $summary,
+					'label_map'     => $post instanceof WP_Post ? $this->assembled_label_map( $post, $language_id ) : array(),
+					'items'         => array(),
+				);
+			}
+
+			$label            = $resolver->label(
+				(string) ( $row->field_key ?? '' ),
+				(string) ( $row->segment_key ?? '' ),
+				$post_type,
+				(string) ( $groups[ $group_key ]['label_map'][ (string) ( $row->segment_key ?? '' ) ] ?? '' )
+			);
+			$row->field_label = $label;
+			$row->post_title  = $groups[ $group_key ]['post_title'];
+			$row->post_type   = $post_type;
+
+			$groups[ $group_key ]['items'][] = $row;
+		}
+
+		$objects = array();
+		foreach ( $order as $group_key ) {
+			$group = $groups[ $group_key ];
+			unset( $group['label_map'] );
+			$objects[] = $group;
+		}
+
+		$result['objects'] = $objects;
+
+		return $result;
+	}
+
+	/**
+	 * Approves every currently pending segment for one object + language.
+	 *
+	 * Safe-subset, non-atomic: reuses {@see ReviewBatchCoordinator} exactly as
+	 * per-segment review does, so QA-blocked / conflicted segments land in
+	 * `skipped` and untranslated segments are never touched. The full pending
+	 * set is resolved first and processed in BATCH_LIMIT-sized chunks so an
+	 * object with more than one batch of pending segments is still fully
+	 * processed.
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 * @param int     $user_id     Acting reviewer id.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function approve_object( WP_Post $post, int $language_id, int $user_id ) {
+		$this->assert_supported_post( $post );
+
+		$pending  = $this->store->pending_segment_keys( Store::SOURCE_POST, (int) $post->ID, $language_id );
+		$approved = array();
+		$skipped  = array();
+
+		foreach ( array_chunk( $pending, ReviewBatchCoordinator::BATCH_LIMIT ) as $chunk ) {
+			$result = $this->review_batch->run_batch(
+				$post,
+				$language_id,
+				ReviewBatchCoordinator::ACTION_APPROVE,
+				array_map(
+					static function ( array $item ): array {
+						return array(
+							'segment_key'                => $item['segment_key'],
+							'submitted_translation_hash' => $item['submitted_translation_hash'],
+						);
+					},
+					$chunk
+				),
+				$user_id
+			);
+
+			if ( $result instanceof WP_Error ) {
+				return $result;
+			}
+
+			$approved = array_merge( $approved, $result['segments'] );
+			$skipped  = array_merge( $skipped, $result['errors'] );
+		}
+
+		$resolver  = new FieldLabelResolver();
+		$labels    = $this->assembled_label_map( $post, $language_id );
+		$post_type = (string) $post->post_type;
+		foreach ( $skipped as &$entry ) {
+			$key                  = (string) ( $entry['segment_key'] ?? '' );
+			$entry['field_label'] = $resolver->label( '', $key, $post_type, (string) ( $labels[ $key ] ?? '' ) );
+		}
+		unset( $entry );
+
+		$summary = $this->object_review_summary( $post, $language_id );
+
+		return array(
+			'post_id'        => (int) $post->ID,
+			'post_title'     => (string) $post->post_title,
+			'post_type'      => $post_type,
+			'language_id'    => $language_id,
+			'approved_count' => count( $approved ),
+			'approved'       => $approved,
+			'skipped'        => array_values( $skipped ),
+			'summary'        => $summary->to_array(),
+		);
+	}
+
+	/**
+	 * Composes the completeness-aware summary for one object + language.
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 */
+	private function object_review_summary( WP_Post $post, int $language_id ): ObjectReviewSummary {
+		return ObjectReviewSummary::compose(
+			$this->store->review_status_counts( Store::SOURCE_POST, (int) $post->ID, $language_id ),
+			$this->status_calculator->for_segments(
+				$post,
+				$language_id,
+				$this->without_slug_segment( $this->assembler->assemble_for_post( $post, $language_id ) )
+			)
+		);
+	}
+
+	/**
+	 * Maps segment_key to an integration-provided field label (empty for core/block).
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 * @return array<string, string>
+	 */
+	private function assembled_label_map( WP_Post $post, int $language_id ): array {
+		$map = array();
+		foreach ( $this->assembler->assemble_for_post( $post, $language_id ) as $segment ) {
+			$key   = (string) ( $segment['segment_key'] ?? '' );
+			$meta  = is_array( $segment['meta'] ?? null ) ? $segment['meta'] : array();
+			$label = trim( (string) ( $meta['field_label'] ?? '' ) );
+			if ( '' !== $key && '' !== $label ) {
+				$map[ $key ] = $label;
+			}
+		}
+
+		return $map;
 	}
 
 	/**

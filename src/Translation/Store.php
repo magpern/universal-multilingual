@@ -1082,6 +1082,50 @@ final class Store {
 	}
 
 	/**
+	 * Returns every segment currently pending review for one object + language.
+	 *
+	 * Unpaginated on purpose: object-level "Approve page" must resolve the
+	 * complete eligible set (a complex Elementor/product page can exceed any
+	 * single batch page) and then process it in bounded chunks. Ordered oldest
+	 * submission first to match the review queue.
+	 *
+	 * @param string $source_type Source type.
+	 * @param int    $source_id   Source object id.
+	 * @param int    $language_id Target language id.
+	 * @return list<array{segment_key: string, submitted_translation_hash: string}>
+	 */
+	public function pending_segment_keys( string $source_type, int $source_id, int $language_id ): array {
+		if ( $source_id <= 0 || $language_id <= 0 || ! $this->translations_table_exists() ) {
+			return array();
+		}
+
+		global $wpdb;
+
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
+			$wpdb->prepare(
+				'SELECT segment_key, submitted_translation_hash FROM ' . Schema::translations() // phpcs:ignore WordPress.DB.PreparedSQL
+				. ' WHERE source_type = %s AND source_id = %d AND language_id = %d AND review_status = %s'
+				. ' ORDER BY review_submitted_at ASC, translation_id ASC',
+				array( $source_type, $source_id, $language_id, self::REVIEW_PENDING )
+			)
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$key = (string) ( $row->segment_key ?? '' );
+			if ( '' === $key ) {
+				continue;
+			}
+			$out[] = array(
+				'segment_key'                => $key,
+				'submitted_translation_hash' => (string) ( $row->submitted_translation_hash ?? '' ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Bounded pending-review age stats, scoped by optional source/language
 	 * (ADR-0015 §13). Query-time diagnostics only.
 	 *

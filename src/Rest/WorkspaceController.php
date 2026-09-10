@@ -366,6 +366,27 @@ final class WorkspaceController {
 
 		register_rest_route(
 			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/(?P<post_id>\d+)/review/approve-object',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'approve_object' ),
+				'permission_callback' => array( $this, 'can_review' ),
+				'args'                => array(
+					'post_id'  => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+					'language' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
 			'/' . self::REST_BASE . '/(?P<post_id>\d+)/segments/(?P<segment_key>.+)/submit-review',
 			array(
 				'methods'             => 'POST',
@@ -1535,11 +1556,13 @@ final class WorkspaceController {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_review_queue( WP_REST_Request $request ) {
-		$args = array(
+		$page     = (int) $request->get_param( 'page' );
+		$per_page = (int) $request->get_param( 'per_page' );
+		$args     = array(
 			'post_id'  => (int) $request->get_param( 'post_id' ),
 			'language' => sanitize_key( (string) ( $request->get_param( 'language' ) ?? '' ) ),
-			'page'     => (int) $request->get_param( 'page' ),
-			'per_page' => (int) $request->get_param( 'per_page' ),
+			'page'     => $page > 0 ? $page : 1,
+			'per_page' => $per_page > 0 ? $per_page : 20,
 		);
 
 		$review_status = $request->get_param( 'review_status' );
@@ -1547,19 +1570,53 @@ final class WorkspaceController {
 			$args['review_status'] = sanitize_key( (string) $review_status );
 		}
 
-		$result = $this->workspace->review_queue( $args );
+		$result = $this->workspace->review_queue_grouped( $args );
 		if ( $result instanceof WP_Error ) {
 			return $result;
+		}
+
+		$objects = array();
+		foreach ( $result['objects'] as $group ) {
+			$group['items'] = $this->review_queue_serializer->many_to_arrays( $group['items'] );
+			$objects[]      = $group;
 		}
 
 		return $this->respond(
 			array(
 				'items'    => $this->review_queue_serializer->many_to_arrays( $result['items'] ),
+				'objects'  => $objects,
 				'total'    => $result['total'],
 				'page'     => $result['page'],
 				'per_page' => $result['per_page'],
 			)
 		);
+	}
+
+	/**
+	 * Approves every currently pending segment for one object + language (RVQ1).
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function approve_object( WP_REST_Request $request ) {
+		$post = $this->resolve_post( $request );
+		if ( $post instanceof WP_Error ) {
+			return $post;
+		}
+
+		$language = $this->resolve_language_param( $request );
+		if ( $language instanceof WP_Error ) {
+			return $language;
+		}
+
+		$result = $this->workspace->approve_object( $post, (int) $language->language_id, get_current_user_id() );
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		$result['approved'] = $this->segment_serializer->many_to_arrays( $result['approved'] );
+
+		return $this->respond( $result );
 	}
 
 	/**

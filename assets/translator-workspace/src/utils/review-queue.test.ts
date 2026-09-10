@@ -2,6 +2,7 @@ import type { LanguageOption, ReviewQueueItem } from '../types/view-models';
 import {
 	allQueueVisibleSelected,
 	deselectAllQueueVisible,
+	groupQueueByObject,
 	groupSelectedByPostLanguage,
 	isQueueItemSelectable,
 	languageCodeForId,
@@ -132,5 +133,55 @@ describe( 'review-queue', () => {
 	it( 'resolves a language code from a language id', () => {
 		expect( languageCodeForId( LANGUAGES, 2 ) ).toBe( 'sv' );
 		expect( languageCodeForId( LANGUAGES, 999 ) ).toBe( '' );
+	} );
+
+	it( 'prefers the server objects block when grouping', () => {
+		const serverGroup = {
+			post_id: 5,
+			post_title: 'Hexarelin',
+			post_type: 'product',
+			object_noun: 'Product',
+			post_status: 'publish',
+			language_id: 2,
+			language_code: 'sv',
+			language_name: 'Swedish',
+			edit_link: '',
+			summary: {
+				total: 14,
+				approved: 0,
+				pending: 14,
+				rejected: 0,
+				untranslated: 0,
+				stale: 0,
+				translated: 14,
+				state: 'ready' as const,
+				is_fully_reviewed: false,
+			},
+			items: [],
+		};
+		expect(
+			groupQueueByObject( {
+				items: [],
+				objects: [ serverGroup ],
+				total: 14,
+				page: 1,
+				per_page: 100,
+			} )
+		).toEqual( [ serverGroup ] );
+	} );
+
+	it( 'derives shallow groups when objects is absent', () => {
+		const groups = groupQueueByObject( {
+			items: [
+				queueItem( { post_id: 1, language_id: 2 } ),
+				queueItem( { post_id: 1, language_id: 2, segment_key: 'x' } ),
+				queueItem( { post_id: 2, language_id: 2 } ),
+			],
+			total: 3,
+			page: 1,
+			per_page: 100,
+		} );
+		expect( groups ).toHaveLength( 2 );
+		expect( groups[ 0 ].items ).toHaveLength( 2 );
 	} );
 } );

@@ -60,13 +60,66 @@ export interface ReviewQueueItem extends ReviewMetadata {
 	translated_text: string;
 	status: string;
 	translation_id: number;
+	/** Server-authoritative human label (RVQ1); absent on older payloads. */
+	field_label?: string;
+	post_title?: string;
+	post_type?: string;
+}
+
+export type ObjectReviewState =
+	| 'ready'
+	| 'needs_attention'
+	| 'incomplete'
+	| 'complete';
+
+export interface ObjectReviewSummary {
+	total: number;
+	approved: number;
+	pending: number;
+	rejected: number;
+	untranslated: number;
+	stale: number;
+	translated: number;
+	state: ObjectReviewState;
+	is_fully_reviewed: boolean;
+}
+
+export interface ReviewObjectGroup {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	object_noun: string;
+	post_status: string;
+	language_id: number;
+	language_code: string;
+	language_name: string;
+	edit_link: string;
+	summary: ObjectReviewSummary;
+	items: ReviewQueueItem[];
 }
 
 export interface ReviewQueueResponse {
 	items: ReviewQueueItem[];
+	objects?: ReviewObjectGroup[];
 	total: number;
 	page: number;
 	per_page: number;
+}
+
+export interface ApproveObjectResult {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	language_id: number;
+	approved_count: number;
+	approved: WorkspaceSegment[];
+	skipped: Array< {
+		segment_key: string;
+		code: string;
+		message: string;
+		field_label?: string;
+	} >;
+	summary: ObjectReviewSummary;
 }
 
 export interface ReviewErrorContext {

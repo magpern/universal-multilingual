@@ -7,6 +7,7 @@ import type {
 	ReviewBatchResult,
 } from '../types/segment-row';
 import type {
+	ApproveObjectResult,
 	ReviewErrorContext,
 	ReviewQueueResponse,
 	SegmentQA,
@@ -927,6 +928,35 @@ export async function fetchReviewQueue(
 	try {
 		return await apiFetch< ReviewQueueResponse >( {
 			path: path( `workspace/review-queue?${ query.toString() }` ),
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
+}
+
+/**
+ * Approves every currently pending segment for one object + language (RVQ1).
+ *
+ * Safe-subset: QA-blocked / conflicted segments come back in `skipped`, and
+ * `summary` reports true completeness so a page is never reported done when
+ * fields were missed.
+ *
+ * @param postId       Object id.
+ * @param languageCode Target language code.
+ * @return Approved segments, skipped segments and the completeness summary.
+ */
+export async function approveObject(
+	postId: number,
+	languageCode: string
+): Promise< ApproveObjectResult > {
+	try {
+		return await apiFetch< ApproveObjectResult >( {
+			path: path(
+				`workspace/${ postId }/review/approve-object?language=${ encodeURIComponent(
+					languageCode
+				) }`
+			),
+			method: 'POST',
 		} );
 	} catch ( error ) {
 		throw new WorkspaceRequestError( userMessageFromError( error ) );

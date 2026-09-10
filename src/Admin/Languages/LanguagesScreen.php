@@ -235,6 +235,7 @@ final class LanguagesScreen {
 		echo '<div class="aiml-ui-layout">';
 
 		$this->render_hero();
+		\AIMultilingual\Admin\AdminNavigation::render( SettingsPage::MENU_SLUG );
 		$this->render_notice();
 		$this->render_list();
 

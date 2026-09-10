@@ -55,8 +55,9 @@ final class RolloutAdminPage {
 
 		$summary = $service->status_summary();
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Limited Rollout', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::SLUG );
 		echo '<p>' . esc_html__( 'Mutations use shared CLI/services with capability checks. Reason codes are operator diagnostics only.', 'universal-multilingual' ) . '</p>';
 		echo '<pre style="background:#fff;padding:1em;border:1px solid #ccd0d4;">';
 		echo esc_html( (string) wp_json_encode( $summary, JSON_PRETTY_PRINT ) );

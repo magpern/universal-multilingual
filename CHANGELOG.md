@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   translation for an object regardless of stale state.
 - New **Settings | Overview** links and a **Documentation** meta link on the
   Plugins screen.
+- A shared **internal navigation bar** (`.aiml-ui-subnav`) at the top of every
+  Universal Multilingual admin screen — Languages, Settings, Limited Rollout,
+  SEO Diagnostics, Translate, Workspace, Glossary, Translation Promotion — so an
+  operator can move between areas without the WordPress sidebar. One renderer
+  (`src/Admin/AdminNavigation`); each tab maps to the owning screen's existing
+  slug constant and existing capability, so a section the current user cannot
+  open never appears. No JavaScript; the active tab is marked by a filled accent
+  pill and `aria-current="page"`.
 
 ### Changed
 

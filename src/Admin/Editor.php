@@ -114,8 +114,9 @@ final class Editor {
 
 		$targets = $this->target_languages();
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Translate', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 
 		$this->render_notice();
 

@@ -521,3 +521,80 @@
 
 .aiml-ui-progress__bar--failed { background: #ef4444; }
 .aiml-ui-progress__bar--complete { background: var(--aiml-success); }
+
+/* Internal section navigation — shared across every Universal Multilingual
+ * admin screen (AIT1). Compact wrapping pills; the active tab is marked by a
+ * filled accent bar, not colour alone. No JS. */
+.aiml-ui-subnav {
+	margin: var(--aiml-space-2) 0;
+}
+
+.aiml-ui-subnav__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	border: 1px solid var(--aiml-ui-card-divider);
+	border-radius: var(--aiml-ui-card-radius);
+	background: var(--aiml-surface);
+	box-shadow: var(--aiml-ui-shadow-sm);
+}
+
+.aiml-ui-subnav__item {
+	margin: 0;
+}
+
+.aiml-ui-subnav__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: var(--aiml-ui-pill-radius);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--aiml-ui-neutral-700);
+	text-decoration: none;
+	background: transparent;
+	border: 1px solid transparent;
+	transition: background var(--aiml-ui-transition), color var(--aiml-ui-transition);
+}
+
+.aiml-ui-subnav__link:hover,
+.aiml-ui-subnav__link:focus {
+	background: var(--aiml-ui-neutral-100);
+	color: var(--aiml-ui-neutral-900);
+}
+
+.aiml-ui-subnav__link:focus-visible {
+	outline: 2px solid var(--aiml-accent);
+	outline-offset: 1px;
+}
+
+.aiml-ui-subnav__link--active {
+	color: #fff;
+	background: var(--aiml-accent);
+}
+
+.aiml-ui-subnav__link--active::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: #fff;
+	flex-shrink: 0;
+}
+
+.aiml-ui-subnav__link--active:hover,
+.aiml-ui-subnav__link--active:focus {
+	background: var(--aiml-accent-hover);
+	color: #fff;
+}
+
+@media (max-width: 782px) {
+	.aiml-ui-subnav__list {
+		padding: 8px;
+	}
+}

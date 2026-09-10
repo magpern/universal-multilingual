@@ -343,6 +343,7 @@ final class SettingsPage {
 		echo '<h2 class="aiml-ui-hero__title">' . esc_html__( 'Settings', 'universal-multilingual' ) . '</h2>';
 		echo '<p class="aiml-ui-hero__subtitle">' . esc_html__( 'Language switcher, translation extraction, localized URLs and AI translation.', 'universal-multilingual' ) . '</p>';
 		echo '</span></header>';
+		\AIMultilingual\Admin\AdminNavigation::render( self::SETTINGS_SLUG );
 		$this->render_notice();
 		echo '<form method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
 

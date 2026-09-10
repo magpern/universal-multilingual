@@ -209,6 +209,53 @@ if ( ! function_exists( 'esc_attr' ) ) {
 	}
 }
 
+if ( ! function_exists( 'esc_html' ) ) {
+	/**
+	 * @param string $text Text.
+	 */
+	function esc_html( $text ) {
+		return htmlspecialchars( (string) $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'esc_attr__' ) ) {
+	/**
+	 * @param string $text   Text.
+	 * @param string $domain Text domain.
+	 */
+	function esc_attr__( $text, $domain = 'default' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		return htmlspecialchars( (string) $text, ENT_QUOTES );
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	/**
+	 * @param string $key Raw key.
+	 */
+	function sanitize_key( $key ) {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	/**
+	 * @param string $path Admin-relative path.
+	 */
+	function admin_url( $path = '' ) {
+		return 'https://example.test/wp-admin/' . ltrim( (string) $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'wp_style_is' ) ) {
+	/**
+	 * @param string $handle Handle.
+	 * @param string $status Status.
+	 */
+	function wp_style_is( $handle, $status = 'enqueued' ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+		return false;
+	}
+}
+
 if ( ! isset( $GLOBALS['aiml_unit_filters'] ) ) {
 	$GLOBALS['aiml_unit_filters'] = array();
 }

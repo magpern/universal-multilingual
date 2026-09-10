@@ -80,8 +80,9 @@ final class SeoDiagnosticsAdminPage {
 			);
 		}
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'SEO Diagnostics', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::SLUG );
 		echo '<p>' . esc_html__(
 			'Read-only health checks over A.SEOa–e contracts. This screen does not change SEO output.',
 			'universal-multilingual'

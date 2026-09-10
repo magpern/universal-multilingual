@@ -1042,6 +1042,7 @@ final class Plugin {
 			( new TranslatorWorkspace( $languages ) )->register();
 			( new \AIMultilingual\Admin\PluginActionLinks() )->register();
 			( new \AIMultilingual\Admin\PostListAiTranslateBulkAction() )->register();
+			( new \AIMultilingual\Admin\AdminNavigation() )->register();
 			( new GlossaryAdminPage( $languages ) )->register();
 			( new TermLocalizedSlugAdmin( $languages ) )->register();
 			( new \AIMultilingual\Admin\PromotionAdminPage( $languages ) )->register();

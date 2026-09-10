@@ -178,6 +178,7 @@ final class TranslatorWorkspace {
 
 		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Translator workspace', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 
 		if ( ! is_readable( plugin_dir_path( AIML_PLUGIN_FILE ) . 'assets/translator-workspace/build/index.js' ) ) {
 			echo '<div class="notice notice-error"><p>';

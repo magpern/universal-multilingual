@@ -39,6 +39,7 @@ cleanup() {
   echo "== teardown: remove fake provider MU-plugin =="
   docker exec wordpress rm -f "/var/www/html/wp-content/mu-plugins/${MU_NAME}" || true
   "$DEV_WP" wp option delete aiml_acceptance_fake_mode >/dev/null 2>&1 || true
+  "$DEV_WP" wp user delete aiml_accept_restricted --yes >/dev/null 2>&1 || true
   "$DEV_WP" wp eval-file "wp-content/plugins/universal-multilingual/acceptance/ai-translation-browser/tools/verify-teardown.php"
 }
 trap cleanup EXIT
@@ -50,6 +51,14 @@ echo "== install fake provider MU-plugin =="
 docker cp "$HERE/${MU_NAME}" "wordpress:/var/www/html/wp-content/mu-plugins/${MU_NAME}"
 docker exec wordpress chown www-data:www-data "/var/www/html/wp-content/mu-plugins/${MU_NAME}"
 "$DEV_WP" wp eval 'echo ( "acceptance-fake" === ( new \AIMultilingual\Translation\AI\ProviderRegistry( new \AIMultilingual\Settings() ) )->active()->get_id() ) ? "FAKE_ACTIVE\n" : "FAKE_INACTIVE\n";'
+
+echo "== provision a restricted-capability user for the subnav test =="
+RESTRICTED_PASS="AitR-$(openssl rand -hex 8)!"
+"$DEV_WP" wp user get aiml_accept_restricted >/dev/null 2>&1 \
+  || "$DEV_WP" wp user create aiml_accept_restricted aiml-restricted@biopentra.eu --role=subscriber --user_pass="$RESTRICTED_PASS" >/dev/null
+"$DEV_WP" wp user update aiml_accept_restricted --user_pass="$RESTRICTED_PASS" >/dev/null
+"$DEV_WP" wp user add-cap aiml_accept_restricted aiml_translate >/dev/null
+export AIML_RESTRICTED_STATE="{\"user\":\"aiml_accept_restricted\",\"pass\":\"$RESTRICTED_PASS\"}"
 
 echo "== seed fixtures =="
 AIML_FIXTURES="$("$DEV_WP" wp eval-file "wp-content/plugins/universal-multilingual/acceptance/ai-translation-browser/tools/seed-fixtures.php" | tail -1)"

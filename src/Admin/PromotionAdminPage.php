@@ -120,8 +120,9 @@ final class PromotionAdminPage {
 			wp_die( esc_html__( 'Unauthorized.', 'universal-multilingual' ) );
 		}
 
-		echo '<div class="wrap aiml-promotion-admin">';
+		echo '<div class="wrap aiml-ui aiml-promotion-admin">';
 		echo '<h1>' . esc_html__( 'Translation Promotion', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 		echo '<p>' . esc_html__( 'Move reviewed translations between environments: build a package here, then import it on the other site with a read-only dry-run before applying.', 'universal-multilingual' ) . '</p>';
 		echo '<div id="aiml-promotion-admin-root"></div>';
 		echo '</div>';

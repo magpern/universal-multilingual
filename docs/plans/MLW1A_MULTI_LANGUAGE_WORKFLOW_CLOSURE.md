@@ -1,9 +1,10 @@
 # MLW1a — Multi-language ("object × language") workflow — Closure
 
-**Status:** Implemented, DEV-accepted. Release **proposed** (v1.18.0) — awaiting
-PO functional sign-off. NOT merged, NOT tagged, NOT released, PROD untouched.
-**Date:** 2026-09-10
-**Branch:** `feature/mlw1a-multi-language-workflow`
+**Status:** Implemented, DEV-accepted, PO-approved. **Released as v1.18.0**
+(2026-09-11) — PR #69 merged to `main`, tag `v1.18.0`. PROD deploy not part of
+this milestone.
+**Date:** 2026-09-11
+**Branch:** `feature/mlw1a-multi-language-workflow` → merged
 **Plan:** [`MLW1_MULTI_LANGUAGE_WORKFLOW_IMPLEMENTATION_PLAN.md`](./MLW1_MULTI_LANGUAGE_WORKFLOW_IMPLEMENTATION_PLAN.md)
 (FROZEN)
 **ADR:** [ADR-0034](../adr/0034-multi-language-workflow.md) (Accepted)

@@ -5,9 +5,9 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.18.0] - 2026-09-11
 
-### Added — MLW1a multi-language workflow (recommended release: v1.18.0)
+### Added — MLW1a multi-language workflow
 
 The translation workflow now scales to **many pages × many languages**.
 See `docs/plans/MLW1_MULTI_LANGUAGE_WORKFLOW_IMPLEMENTATION_PLAN.md` (FROZEN)

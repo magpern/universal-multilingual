@@ -46,6 +46,8 @@ final class JobsWorkerTest extends AimlTestCase {
 
 	private BackgroundTranslationWorker $worker;
 
+	private RecordingJobsScheduler $scheduler;
+
 	private BackgroundTranslationItemRepository $items;
 
 	private BackgroundTranslationJobRepository $jobs;
@@ -104,13 +106,18 @@ final class JobsWorkerTest extends AimlTestCase {
 			$this->job_store,
 			$assembler
 		);
-		$this->worker      = new BackgroundTranslationWorker(
+		require_once __DIR__ . '/RecordingJobsScheduler.php';
+		$this->scheduler = new RecordingJobsScheduler();
+		$this->worker    = new BackgroundTranslationWorker(
 			$processor,
 			$this->job_service,
 			$this->jobs,
 			$this->items,
 			$this->leases,
-			$reconciler
+			$reconciler,
+			null,
+			null,
+			$this->scheduler
 		);
 	}
 
@@ -143,6 +150,55 @@ final class JobsWorkerTest extends AimlTestCase {
 		$this->assertSame( Store::STATUS_MACHINE_TRANSLATED, $row->status );
 		$this->assertSame( Store::REVIEW_NOT_SUBMITTED, $row->review_status );
 		$this->assertStringStartsWith( 'SV:', (string) $row->translated_text );
+	}
+
+	public function test_worker_reschedules_next_wake_when_claimable_items_remain(): void {
+		$language = $this->add_language();
+
+		$blocks = '';
+		for ( $i = 1; $i <= 14; $i++ ) {
+			$uuid    = sprintf( '550e8400-e29b-41d4-a716-4466554400%02d', $i );
+			$blocks .= sprintf(
+				'<!-- wp:paragraph {"%1$s":"%2$s"} --><p>Paragraph number %3$d.</p><!-- /wp:paragraph -->',
+				\AIMultilingual\Block\Contract::ATTR_NAME,
+				$uuid,
+				$i
+			);
+		}
+		$post = $this->create_page( 'Many segments page', $blocks );
+
+		$job = $this->job_service->create_job(
+			array(
+				'job_type'       => JobTypes::TRANSLATE_MISSING,
+				'source_type'    => Store::SOURCE_POST,
+				'source_id'      => (int) $post->ID,
+				'language_id'    => (int) $language->language_id,
+				'provider_id'    => 'echo',
+				'prompt_profile' => 'default',
+				'prompt_version' => '1',
+				'created_by'     => 1,
+			)
+		);
+		$this->assertNotInstanceOf( WP_Error::class, $job );
+		$job_id = (int) $job->job_id;
+		$this->assertGreaterThan( 10, (int) $job->total_items, 'fixture must exceed one bounded wake' );
+
+		// First bounded wake: stops at MAX_ITEMS_PER_WAKE and must arm the next.
+		$after_first = $this->worker->run( $job_id, 'wake-1' );
+		$this->assertNotInstanceOf( WP_Error::class, $after_first );
+		$this->assertSame( JobStatuses::RUNNING, $after_first->status );
+		$this->assertSame( 10, (int) $after_first->completed_items );
+		$this->assertContains(
+			$job_id,
+			$this->scheduler->enqueued,
+			'worker must re-enqueue its own wake while claimable items remain'
+		);
+
+		// Second wake drains the rest and finalises.
+		$after_second = $this->worker->run( $job_id, 'wake-2' );
+		$this->assertNotInstanceOf( WP_Error::class, $after_second );
+		$this->assertSame( JobStatuses::COMPLETED, $after_second->status );
+		$this->assertSame( (int) $job->total_items, (int) $after_second->completed_items );
 	}
 
 	public function test_pending_review_segment_skips_conflict(): void {

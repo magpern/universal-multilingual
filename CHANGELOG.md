@@ -5,6 +5,17 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.1] - 2026-09-10
+
+### Added
+
+- **Delete translation** — a Workspace action (and `DELETE
+  aiml/v1/workspace/<id>/translation`) that removes every stored translation
+  segment for one post in one language, plus the localized route and its
+  history for that language, so a translator can start over. Behind a
+  destructive confirm. `Store::delete_object()` (previously unused) is the
+  single writer; the canonical post is never touched.
+
 ## [1.16.0] - 2026-09-10
 
 ### Added

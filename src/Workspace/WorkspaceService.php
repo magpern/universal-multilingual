@@ -1095,6 +1095,31 @@ final class WorkspaceService {
 	}
 
 	/**
+	 * Deletes every stored translation of one post in one language — the
+	 * "start over" action. Removes all segment rows (including the localized
+	 * URL slug candidate) and purges the localized route + its history for
+	 * that language. The canonical post is never touched.
+	 *
+	 * @param WP_Post $post        Post.
+	 * @param int     $language_id Language id.
+	 * @return array<string, mixed>
+	 */
+	public function delete_translation( WP_Post $post, int $language_id ): array {
+		$this->assert_supported_post( $post );
+
+		if ( null !== $this->route_publication ) {
+			$this->route_publication->purge_for_source_language( (int) $post->ID, $language_id );
+		}
+
+		$this->store->delete_object( Store::SOURCE_POST, (int) $post->ID, $language_id );
+
+		return array(
+			'segments' => $this->load_segments( $post, $language_id ),
+			'status'   => $this->page_status( $post, $language_id ),
+		);
+	}
+
+	/**
 	 * Slug/route sync view model (MSEO.1).
 	 *
 	 * @param WP_Post $post        Post.

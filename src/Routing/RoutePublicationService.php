@@ -645,6 +645,20 @@ final class RoutePublicationService {
 	}
 
 	/**
+	 * Purges the localized route and its history for one post/language.
+	 *
+	 * Used by "delete this translation / start over" — the slug candidate row
+	 * itself is a translation segment removed by Store::delete_object().
+	 *
+	 * @param int $post_id     Post id.
+	 * @param int $language_id Language id.
+	 */
+	public function purge_for_source_language( int $post_id, int $language_id ): void {
+		$this->routes->delete_by_object( Store::SOURCE_POST, $post_id, $language_id );
+		$this->history->delete_oldest_beyond( Store::SOURCE_POST, $post_id, $language_id, 0 );
+	}
+
+	/**
 	 * Builds UI/REST sync facts for a post/language.
 	 *
 	 * @param WP_Post $post        Post.

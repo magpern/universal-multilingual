@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.16.0
+Stable tag: 1.16.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,9 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.16.1 =
+* New "Delete translation" action in the Translator Workspace: removes every translated segment for the current page in the current language (including manually edited/reviewed text and the localized URL) plus its localized route, so you can start over. Confirmation required; the canonical page is never touched. New DELETE aiml/v1/workspace/<id>/translation endpoint.
 
 = 1.16.0 =
 * Localized URL as part of translation: the localized slug is proposed automatically after "Translate with AI" and on Workspace load (following the translated title), shown as a plain "URL for <language>" with an Edit action and a clear state ("Ready when Swedish is published." / "Ready to publish." / "Published."). A manually edited slug is never overwritten. The technical lifecycle controls (Regenerate / Clear / Publish route / Refresh, origin and route detail) move under "Advanced URL controls". New POST aiml/v1/workspace/<id>/slug/ensure endpoint.

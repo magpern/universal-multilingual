@@ -347,6 +347,20 @@ export async function fetchSegments(
 	} );
 }
 
+export async function deleteTranslation(
+	postId: number,
+	languageCode: string
+): Promise< WorkspaceSegmentsResponse > {
+	return apiFetch< WorkspaceSegmentsResponse >( {
+		path: path(
+			`workspace/${ postId }/translation?language=${ encodeURIComponent(
+				languageCode
+			) }`
+		),
+		method: 'DELETE',
+	} );
+}
+
 export async function fetchPreviewUrl(
 	postId: number,
 	languageCode: string

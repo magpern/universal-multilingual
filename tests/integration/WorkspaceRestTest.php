@@ -205,6 +205,64 @@ final class WorkspaceRestTest extends AimlTestCase {
 		$this->assertSame( 'manual', $view['slug_origin'] );
 	}
 
+	public function test_delete_translation_removes_every_segment_and_the_slug(): void {
+		$language = $this->add_language();
+		$post     = $this->create_page( 'About Us', '<p>English body.</p>' );
+		wp_set_current_user( $this->create_translator() );
+
+		foreach (
+			array(
+				Extractor::FIELD_TITLE   => 'Om oss',
+				Extractor::FIELD_CONTENT => '<p>Svensk text.</p>',
+			) as $field => $text
+		) {
+			$this->store->save_translation(
+				array(
+					'source_type'     => Store::SOURCE_POST,
+					'source_id'       => (int) $post->ID,
+					'source_subtype'  => 'page',
+					'language_id'     => (int) $language->language_id,
+					'field_key'       => $field,
+					'segment_key'     => $field,
+					'segment_kind'    => Store::KIND_FIELD,
+					'text_format'     => Extractor::FIELD_CONTENT === $field ? Store::FORMAT_HTML : Store::FORMAT_PLAIN,
+					'source_text'     => Extractor::FIELD_CONTENT === $field ? '<p>English body.</p>' : 'About Us',
+					'translated_text' => $text,
+					'status'          => Store::STATUS_MACHINE_TRANSLATED,
+				)
+			);
+		}
+
+		$ensure = new WP_REST_Request( 'POST', '/aiml/v1/workspace/' . (int) $post->ID . '/slug/ensure' );
+		$ensure->set_param( 'language', 'sv' );
+		$this->assertSame( 'om-oss', rest_do_request( $ensure )->get_data()['slug_candidate'] );
+
+		$delete = new WP_REST_Request( 'DELETE', '/aiml/v1/workspace/' . (int) $post->ID . '/translation' );
+		$delete->set_param( 'language', 'sv' );
+		$response = rest_do_request( $delete );
+		$this->assertSame( 200, $response->get_status() );
+
+		global $wpdb;
+		$this->assertSame(
+			'0',
+			(string) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->prefix}aiml_translations WHERE source_id = %d AND language_id = %d",
+					(int) $post->ID,
+					(int) $language->language_id
+				)
+			)
+		);
+
+		$view = rest_do_request( $ensure )->get_data();
+		// After delete + re-ensure there is no translated title, so no candidate.
+		$this->assertSame( '', $view['slug_candidate'] );
+
+		// Canonical page untouched.
+		$fresh = get_post( (int) $post->ID );
+		$this->assertSame( 'About Us', $fresh->post_title );
+	}
+
 	public function test_untranslated_segments_carry_no_qa_noise(): void {
 		$this->add_language();
 		$post = $this->create_block_page();

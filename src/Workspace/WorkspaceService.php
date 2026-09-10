@@ -724,15 +724,18 @@ final class WorkspaceService {
 		$suggestions         = $this->suggestions->request_suggestions( $segment, $context );
 		$meta                = is_array( $segment['meta'] ?? null ) ? $segment['meta'] : array();
 		$meta['suggestions'] = $suggestions;
-		$meta['qa']          = $this->qa->evaluate(
-			(string) ( $segment['source_text'] ?? '' ),
-			(string) ( $segment['translated_text'] ?? '' ),
-			(string) ( $segment['text_format'] ?? Store::FORMAT_PLAIN ),
-			array(
-				'source_language_id' => $default ? (int) $default->language_id : 0,
-				'target_language_id' => $language_id,
-			)
-		)->to_array();
+		$suggest_target      = (string) ( $segment['translated_text'] ?? '' );
+		$meta['qa']          = '' === trim( $suggest_target )
+			? ( new QAResult( array() ) )->to_array()
+			: $this->qa->evaluate(
+				(string) ( $segment['source_text'] ?? '' ),
+				$suggest_target,
+				(string) ( $segment['text_format'] ?? Store::FORMAT_PLAIN ),
+				array(
+					'source_language_id' => $default ? (int) $default->language_id : 0,
+					'target_language_id' => $language_id,
+				)
+			)->to_array();
 		$segment['meta']     = $meta;
 
 		return $segment;
@@ -1597,15 +1600,25 @@ final class WorkspaceService {
 			$key                 = (string) ( $segment['segment_key'] ?? '' );
 			$meta                = is_array( $segment['meta'] ?? null ) ? $segment['meta'] : array();
 			$meta['suggestions'] = $by_key[ $key ] ?? array();
-			$meta['qa']          = $this->qa->evaluate(
-				(string) ( $segment['source_text'] ?? '' ),
-				(string) ( $segment['translated_text'] ?? '' ),
-				(string) ( $segment['text_format'] ?? Store::FORMAT_PLAIN ),
-				array(
-					'source_language_id' => $default ? (int) $default->language_id : 0,
-					'target_language_id' => $language_id,
-				)
-			)->to_array();
+			$target_text         = (string) ( $segment['translated_text'] ?? '' );
+
+			// A segment with no translation yet has no translation quality to
+			// report — the Status column already shows "Missing". Running the
+			// detectors here only turns every untranslated segment (a fresh
+			// page, or fields the AI flow does not touch such as the URL slug)
+			// into a wall of empty_translation / number / tag warnings. Quality
+			// checks still run in full on the save and review paths.
+			$meta['qa'] = '' === trim( $target_text )
+				? ( new QAResult( array() ) )->to_array()
+				: $this->qa->evaluate(
+					(string) ( $segment['source_text'] ?? '' ),
+					$target_text,
+					(string) ( $segment['text_format'] ?? Store::FORMAT_PLAIN ),
+					array(
+						'source_language_id' => $default ? (int) $default->language_id : 0,
+						'target_language_id' => $language_id,
+					)
+				)->to_array();
 			// TI.5: same assessment core; Workspace save-path has no request markers.
 			$post_type                  = (string) ( $segment['source_subtype'] ?? '' );
 			$meta['assessment']         = $this->assessment->assess_segment(

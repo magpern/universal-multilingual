@@ -5,6 +5,20 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.2] - 2026-09-10
+
+### Fixed
+
+- The Translator Workspace no longer renders **Quality checks** findings
+  (`empty_translation`, `qd9_number_corruption`, `qd6_html_tag_loss`, …) for a
+  segment whose target is still empty. There is no translation to assess, the
+  Status column already shows *Missing*, and the detectors otherwise turned
+  every untranslated segment — a fresh page, or fields the AI flow does not
+  translate such as the URL slug (`post_name`) — into a wall of warnings.
+  `WorkspaceService::attach_meta()` and `request_suggestions()` return an empty
+  QA result for an empty target; the save and review paths still run the full
+  detector suite. No schema or settings change.
+
 ## [1.15.1] - 2026-09-10
 
 ### Fixed

@@ -116,6 +116,26 @@ final class WorkspaceRestTest extends AimlTestCase {
 		$this->assertNotEmpty( $response->get_data()['items'] );
 	}
 
+	public function test_untranslated_segments_carry_no_qa_noise(): void {
+		$this->add_language();
+		$post = $this->create_block_page();
+		wp_set_current_user( $this->create_translator() );
+
+		$load = new WP_REST_Request( 'GET', '/aiml/v1/workspace/' . (int) $post->ID . '/segments' );
+		$load->set_param( 'language', 'sv' );
+		$segments = rest_do_request( $load )->get_data()['segments'];
+		$this->assertNotEmpty( $segments );
+
+		foreach ( $segments as $segment ) {
+			$this->assertSame( '', trim( (string) ( $segment['translated_text'] ?? '' ) ) );
+			$summary = $segment['meta']['qa']['summary'] ?? array();
+			$this->assertSame( 0, (int) ( $summary['errors'] ?? -1 ) );
+			$this->assertSame( 0, (int) ( $summary['warnings'] ?? -1 ) );
+			$this->assertSame( 0, (int) ( $summary['info'] ?? -1 ) );
+			$this->assertEmpty( $segment['meta']['qa']['issues'] ?? array() );
+		}
+	}
+
 	public function test_empty_translation_becomes_missing(): void {
 		$language = $this->add_language();
 		$post     = $this->create_block_page();

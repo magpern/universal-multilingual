@@ -56,7 +56,10 @@ final class LiveOpenAiTranslationTest extends AimlTestCase {
 		if ( '' === $key ) {
 			$this->markTestSkipped( 'Set AIML_LIVE_OPENAI_API_KEY to run the live provider test.' );
 		}
-		$model = (string) ( getenv( 'AIML_LIVE_OPENAI_MODEL' ) ?: 'gpt-5-mini' );
+		$model = (string) getenv( 'AIML_LIVE_OPENAI_MODEL' );
+		if ( '' === $model ) {
+			$model = 'gpt-5-mini';
+		}
 
 		$this->enable_strategy_f_flags();
 

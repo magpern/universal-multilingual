@@ -964,3 +964,41 @@
 	font-weight: 600;
 	flex-basis: 100%;
 }
+
+/* MLW1a — object-first Review Queue card (WP6). */
+
+.aiml-translator-workspace .aiml-review-object-card {
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 1rem 1.25rem;
+	margin: 0 0 1rem;
+	background: #fff;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__header {
+	margin-bottom: 0.5rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__title {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__meta {
+	margin: 0.15rem 0 0;
+	color: #646970;
+	font-size: 0.85em;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0 0.75rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__language-state {
+	font-weight: 600;
+	margin: 0.5rem 0;
+}

@@ -8,6 +8,7 @@ import type {
 } from '../types/segment-row';
 import type {
 	ApproveObjectResult,
+	ApproveObjectLanguagesResult,
 	ObjectLanguagesResponse,
 	ReviewErrorContext,
 	ReviewQueueResponse,
@@ -992,6 +993,28 @@ export async function approveObject(
 				) }`
 			),
 			method: 'POST',
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
+}
+
+/**
+ * MLW1a (WP5/WP6) — "Approve all ready languages" for one object. Each ready
+ * language's full pending set is approved server-side in bounded chunks.
+ *
+ * @param postId        Canonical post id.
+ * @param languageCodes Ready language codes (from readyLanguageCodes()).
+ */
+export async function approveObjectLanguages(
+	postId: number,
+	languageCodes: string[]
+): Promise< ApproveObjectLanguagesResult > {
+	try {
+		return await apiFetch< ApproveObjectLanguagesResult >( {
+			path: path( `workspace/${ postId }/review/approve-object` ),
+			method: 'POST',
+			data: { languages: languageCodes },
 		} );
 	} catch ( error ) {
 		throw new WorkspaceRequestError( userMessageFromError( error ) );

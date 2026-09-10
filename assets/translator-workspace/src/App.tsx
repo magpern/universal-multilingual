@@ -9,6 +9,7 @@ import {
 	approveReview,
 	batchReview,
 	configureWorkspaceApi,
+	deleteTranslation,
 	fetchPreviewUrl,
 	fetchSegments,
 	rejectReview,
@@ -954,6 +955,44 @@ export default function App() {
 		);
 	};
 
+	const handleDeleteTranslation = async () => {
+		if ( ! postId || ! languageCode ) {
+			return;
+		}
+		const confirmed = await requestConfirm( {
+			title: __( 'Delete this translation?', 'ai-multilingual' ),
+			message: __(
+				'Every translated segment for this page in this language — including manually edited and reviewed text and the localized URL — is permanently deleted so you can start over. The original page is not affected.',
+				'ai-multilingual'
+			),
+			isDestructive: true,
+			confirmLabel: __( 'Delete translation', 'ai-multilingual' ),
+		} );
+		if ( ! confirmed ) {
+			return;
+		}
+		setLoading( true );
+		setError( '' );
+		setBatchMessage( '' );
+		try {
+			const response = await deleteTranslation( postId, languageCode );
+			setRows( createRowsFromSegments( response.segments ) );
+			setStatus( response.status );
+			setSegmentFilter( 'all' );
+			setSelectedKeys( clearSelection() );
+			setSlugRefresh( ( n ) => n + 1 );
+			setBatchMessage(
+				__( 'Translation deleted — you can start over.', 'ai-multilingual' )
+			);
+		} catch {
+			setError(
+				__( 'The translation could not be deleted.', 'ai-multilingual' )
+			);
+		} finally {
+			setLoading( false );
+		}
+	};
+
 	const handlePreview = async () => {
 		if ( ! postId || ! languageCode ) {
 			return;
@@ -1125,6 +1164,17 @@ export default function App() {
 										disabled={ ! postId || ! languageCode }
 									>
 										{ __( 'Preview', 'ai-multilingual' ) }
+									</Button>
+									<Button
+										variant="link"
+										isDestructive
+										onClick={ handleDeleteTranslation }
+										disabled={ loading || batchSaving || ! postId }
+									>
+										{ __(
+											'Delete translation',
+											'ai-multilingual'
+										) }
 									</Button>
 								</div>
 							</div>

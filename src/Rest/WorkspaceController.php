@@ -232,6 +232,27 @@ final class WorkspaceController {
 
 		register_rest_route(
 			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/(?P<post_id>\d+)/translation',
+			array(
+				'methods'             => 'DELETE',
+				'callback'            => array( $this, 'delete_translation' ),
+				'permission_callback' => array( $this, 'can_edit_post' ),
+				'args'                => array(
+					'post_id'  => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+					'language' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
 			'/' . self::REST_BASE . '/(?P<post_id>\d+)/preview-url',
 			array(
 				'methods'             => 'GET',
@@ -765,6 +786,38 @@ final class WorkspaceController {
 						(int) $language->language_id,
 						$segments
 					)
+				)->to_array(),
+			)
+		);
+	}
+
+	/**
+	 * Deletes every stored translation of one post in one language ("start over").
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_translation( WP_REST_Request $request ) {
+		$post = $this->resolve_post( $request );
+		if ( $post instanceof WP_Error ) {
+			return $post;
+		}
+
+		$language = $this->resolve_language_param( $request );
+		if ( $language instanceof WP_Error ) {
+			return $language;
+		}
+
+		$result   = $this->workspace->delete_translation( $post, (int) $language->language_id );
+		$segments = $result['segments'];
+
+		return $this->respond(
+			array(
+				'post_id'     => (int) $post->ID,
+				'language_id' => (int) $language->language_id,
+				'segments'    => $this->segment_serializer->many_to_arrays( $segments ),
+				'status'      => $this->status_serializer->from_dto(
+					$this->workspace->page_status_for_segments( $post, (int) $language->language_id, $segments )
 				)->to_array(),
 			)
 		);

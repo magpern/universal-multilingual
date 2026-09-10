@@ -3,49 +3,54 @@ import { Button, Notice, Spinner } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 
 import {
+	approveObject,
 	approveReview,
 	batchReview,
 	fetchReviewQueue,
 	rejectReview,
 } from '../api/workspace-api';
-import type { LanguageOption, ReviewQueueItem } from '../types/view-models';
+import type {
+	ApproveObjectResult,
+	LanguageOption,
+	ReviewObjectGroup as ReviewObjectGroupModel,
+	ReviewQueueItem,
+} from '../types/view-models';
+import { objectSummaryLine } from '../utils/object-review';
 import {
-	allQueueVisibleSelected,
 	clearQueueSelection,
-	deselectAllQueueVisible,
-	groupSelectedByPostLanguage,
+	groupQueueByObject,
 	isQueueItemSelectable,
 	languageCodeForId,
 	queueItemKey,
-	selectAllQueueVisible,
-	selectableQueueItems,
-	selectedQueueItems,
 	toggleQueueSelection,
 } from '../utils/review-queue';
 import type { ReviewQueueFilter } from '../utils/review-status';
 import ReviewDecisionDialog from './ReviewDecisionDialog';
+import ReviewObjectGroup from './ReviewObjectGroup';
 import ReviewQueueFilterBar from './ReviewQueueFilterBar';
-import ReviewQueueRow from './ReviewQueueRow';
-import ReviewQueueToolbar from './ReviewQueueToolbar';
 
 interface ReviewQueuePanelProps {
 	languages: LanguageOption[];
 	canTranslate: boolean;
 	onOpenInEditor: ( postId: number, languageCode: string ) => void;
-	onOpenInOperations?: ( translationId: number, languageCode: string ) => void;
+	onOpenInOperations?: (
+		translationId: number,
+		languageCode: string
+	) => void;
 	initialLanguageCode?: string;
 	initialPostId?: string;
 }
 
-interface ReviewDialogState {
+interface DialogState {
 	action: 'approve' | 'reject';
 	targets: ReviewQueueItem[];
+	languageCode: string;
 	reason: string;
 	busy: boolean;
 	error: string;
 }
 
-const PER_PAGE = 20;
+const PER_PAGE = 100;
 
 export default function ReviewQueuePanel( {
 	languages,
@@ -55,21 +60,23 @@ export default function ReviewQueuePanel( {
 	initialLanguageCode = '',
 	initialPostId = '',
 }: ReviewQueuePanelProps ) {
-	const [ reviewStatus, setReviewStatus ] = useState< ReviewQueueFilter >(
-		'pending'
-	);
+	const [ reviewStatus, setReviewStatus ] =
+		useState< ReviewQueueFilter >( 'pending' );
 	const [ languageCode, setLanguageCode ] = useState( initialLanguageCode );
 	const [ postIdFilter, setPostIdFilter ] = useState( initialPostId );
 	const [ page, setPage ] = useState( 1 );
-	const [ items, setItems ] = useState< ReviewQueueItem[] >( [] );
+	const [ groups, setGroups ] = useState< ReviewObjectGroupModel[] >( [] );
 	const [ total, setTotal ] = useState( 0 );
 	const [ loading, setLoading ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ message, setMessage ] = useState( '' );
+	const [ objectResult, setObjectResult ] =
+		useState< ApproveObjectResult | null >( null );
 	const [ selectedKeys, setSelectedKeys ] = useState< Set< string > >(
 		() => new Set()
 	);
-	const [ dialog, setDialog ] = useState< ReviewDialogState | null >( null );
+	const [ dialog, setDialog ] = useState< DialogState | null >( null );
+	const [ busy, setBusy ] = useState( false );
 
 	const load = useCallback( async () => {
 		setLoading( true );
@@ -87,13 +94,13 @@ export default function ReviewQueuePanel( {
 				page,
 				perPage: PER_PAGE,
 			} );
-			setItems( response.items );
+			setGroups( groupQueueByObject( response ) );
 			setTotal( response.total );
 		} catch {
 			setError(
 				__( 'Could not load the review queue.', 'ai-multilingual' )
 			);
-			setItems( [] );
+			setGroups( [] );
 			setTotal( 0 );
 		} finally {
 			setLoading( false );
@@ -110,44 +117,53 @@ export default function ReviewQueuePanel( {
 	}, [ reviewStatus, languageCode, postIdFilter ] );
 
 	const totalPages = Math.max( 1, Math.ceil( total / PER_PAGE ) );
-	const selectableVisible = selectableQueueItems( items );
+
+	const groupLanguageCode = ( group: ReviewObjectGroupModel ): string =>
+		group.language_code ||
+		languageCodeForId( languages, group.language_id );
+
+	const selectedItemsInGroup = (
+		group: ReviewObjectGroupModel
+	): ReviewQueueItem[] =>
+		group.items.filter(
+			( item ) =>
+				isQueueItemSelectable( item ) &&
+				selectedKeys.has( queueItemKey( item ) )
+		);
 
 	const openDialog = (
 		targets: ReviewQueueItem[],
-		action: 'approve' | 'reject'
+		action: 'approve' | 'reject',
+		code: string
 	) => {
-		if ( 0 === targets.length ) {
+		if ( 0 === targets.length || ! code ) {
 			return;
 		}
-		setDialog( { action, targets, reason: '', busy: false, error: '' } );
+		setDialog( {
+			action,
+			targets,
+			languageCode: code,
+			reason: '',
+			busy: false,
+			error: '',
+		} );
 	};
-
-	const closeDialog = () => setDialog( null );
 
 	const confirmDialog = async () => {
 		if ( ! dialog ) {
 			return;
 		}
-
 		setDialog( ( current ) =>
 			current ? { ...current, busy: true, error: '' } : current
 		);
 
-		if ( 1 === dialog.targets.length ) {
-			const item = dialog.targets[ 0 ];
-			const code = languageCodeForId( languages, item.language_id );
-
-			try {
-				if ( ! code ) {
-					throw new Error(
-						__( 'Unknown language for this item.', 'ai-multilingual' )
-					);
-				}
-
+		try {
+			if ( 1 === dialog.targets.length ) {
+				const item = dialog.targets[ 0 ];
 				if ( 'approve' === dialog.action ) {
 					await approveReview(
 						item.post_id,
-						code,
+						dialog.languageCode,
 						item.segment_key,
 						undefined,
 						item.submitted_translation_hash
@@ -155,89 +171,74 @@ export default function ReviewQueuePanel( {
 				} else {
 					await rejectReview(
 						item.post_id,
-						code,
+						dialog.languageCode,
 						item.segment_key,
 						dialog.reason,
 						undefined,
 						item.submitted_translation_hash
 					);
 				}
-
-				setDialog( null );
-				setSelectedKeys( ( current ) =>
-					toggleQueueSelection( current, queueItemKey( item ), false )
-				);
-				setMessage(
-					'approve' === dialog.action
-						? __( 'Segment approved.', 'ai-multilingual' )
-						: __( 'Segment rejected.', 'ai-multilingual' )
-				);
-				load();
-			} catch ( unknownError ) {
-				const errorMessage =
-					unknownError instanceof Error
-						? unknownError.message
-						: __(
-								'The review action could not be completed.',
-								'ai-multilingual'
-						  );
-				setDialog( ( current ) =>
-					current
-						? { ...current, busy: false, error: errorMessage }
-						: current
-				);
-			}
-			return;
-		}
-
-		const groups = groupSelectedByPostLanguage( dialog.targets );
-		let successCount = 0;
-		let failureCount = 0;
-
-		for ( const group of groups ) {
-			const code = languageCodeForId( languages, group.languageId );
-			if ( ! code ) {
-				failureCount += group.items.length;
-				continue;
-			}
-
-			try {
-				const result = await batchReview(
-					group.postId,
-					code,
+			} else {
+				await batchReview(
+					dialog.targets[ 0 ].post_id,
+					dialog.languageCode,
 					dialog.action,
-					group.items.map( ( item ) => ( {
+					dialog.targets.map( ( item ) => ( {
 						segment_key: item.segment_key,
-						submitted_translation_hash: item.submitted_translation_hash,
+						submitted_translation_hash:
+							item.submitted_translation_hash,
 					} ) ),
 					dialog.reason
 				);
-				successCount += result.updated.length;
-				failureCount += result.errors.length;
-			} catch {
-				failureCount += group.items.length;
 			}
-		}
 
-		setDialog( null );
-		setSelectedKeys( clearQueueSelection() );
-		setMessage(
-			0 === failureCount
-				? sprintf(
-						/* translators: %d: succeeded count */
-						'approve' === dialog.action
-							? __( '%d segment(s) approved.', 'ai-multilingual' )
-							: __( '%d segment(s) rejected.', 'ai-multilingual' ),
-						successCount
-				  )
-				: sprintf(
-						/* translators: 1: succeeded count, 2: failed count */
-						__( '%1$d succeeded, %2$d failed.', 'ai-multilingual' ),
-						successCount,
-						failureCount
-				  )
-		);
-		load();
+			setDialog( null );
+			setSelectedKeys( clearQueueSelection() );
+			setObjectResult( null );
+			setMessage(
+				'approve' === dialog.action
+					? __( 'Approved.', 'ai-multilingual' )
+					: __( 'Rejected.', 'ai-multilingual' )
+			);
+			load();
+		} catch ( unknownError ) {
+			const errorMessage =
+				unknownError instanceof Error
+					? unknownError.message
+					: __(
+							'The review action could not be completed.',
+							'ai-multilingual'
+					  );
+			setDialog( ( current ) =>
+				current
+					? { ...current, busy: false, error: errorMessage }
+					: current
+			);
+		}
+	};
+
+	const handleApproveObject = async ( group: ReviewObjectGroupModel ) => {
+		const code = groupLanguageCode( group );
+		if ( ! code ) {
+			return;
+		}
+		setBusy( true );
+		setMessage( '' );
+		setObjectResult( null );
+		try {
+			const result = await approveObject( group.post_id, code );
+			setObjectResult( result );
+			setSelectedKeys( clearQueueSelection() );
+			load();
+		} catch ( unknownError ) {
+			setError(
+				unknownError instanceof Error
+					? unknownError.message
+					: __( 'Could not approve this object.', 'ai-multilingual' )
+			);
+		} finally {
+			setBusy( false );
+		}
 	};
 
 	return (
@@ -268,25 +269,37 @@ export default function ReviewQueuePanel( {
 				</Notice>
 			) }
 
-			<ReviewQueueToolbar
-				selectedCount={ selectedKeys.size }
-				busy={ loading || null !== dialog }
-				onApproveSelected={ () =>
-					openDialog(
-						selectedQueueItems( items, selectedKeys ),
-						'approve'
-					)
-				}
-				onRejectSelected={ () =>
-					openDialog(
-						selectedQueueItems( items, selectedKeys ),
-						'reject'
-					)
-				}
-				onClearSelection={ () =>
-					setSelectedKeys( clearQueueSelection() )
-				}
-			/>
+			{ objectResult && (
+				<Notice
+					status={
+						objectResult.summary.is_fully_reviewed
+							? 'success'
+							: 'warning'
+					}
+					isDismissible={ true }
+					onRemove={ () => setObjectResult( null ) }
+				>
+					<strong>{ objectResult.post_title }</strong>:{ ' ' }
+					{ objectSummaryLine(
+						objectResult.summary,
+						objectResult.post_type === 'product'
+							? __( 'product', 'ai-multilingual' )
+							: __( 'page', 'ai-multilingual' )
+					) }
+					{ objectResult.skipped.length > 0 && (
+						<ul className="aiml-review-object-group__skipped">
+							{ objectResult.skipped.map( ( skip ) => (
+								<li key={ skip.segment_key }>
+									{ skip.field_label || skip.segment_key }
+									{ skip.message
+										? ` — ${ skip.message }`
+										: '' }
+								</li>
+							) ) }
+						</ul>
+					) }
+				</Notice>
+			) }
 
 			{ loading && <Spinner /> }
 
@@ -296,97 +309,78 @@ export default function ReviewQueuePanel( {
 				</Notice>
 			) }
 
-			{ ! loading && ! error && 0 === items.length && (
+			{ ! loading && ! error && 0 === groups.length && (
 				<Notice status="info" isDismissible={ false }>
 					{ __(
-						'No segments match the current review queue filters.',
+						'No translations match the current review queue filters.',
 						'ai-multilingual'
 					) }
 				</Notice>
 			) }
 
-			{ ! loading && ! error && items.length > 0 && (
-				<table className="aiml-review-queue-table widefat striped">
-					<thead>
-						<tr>
-							<th scope="col">
-								<label
-									className="screen-reader-text"
-									htmlFor="aiml-queue-select-all"
-								>
-									{ __(
-										'Select all visible pending segments',
-										'ai-multilingual'
-									) }
-								</label>
-								<input
-									id="aiml-queue-select-all"
-									type="checkbox"
-									checked={ allQueueVisibleSelected(
-										items,
-										selectedKeys
-									) }
-									disabled={ 0 === selectableVisible.length }
-									onChange={ ( event ) =>
-										setSelectedKeys( ( current ) =>
-											event.target.checked
-												? selectAllQueueVisible(
-														current,
-														items
-												  )
-												: deselectAllQueueVisible(
-														current,
-														items
-												  )
-										)
-									}
-								/>
-							</th>
-							<th scope="col">{ __( 'Post', 'ai-multilingual' ) }</th>
-							<th scope="col">{ __( 'Language', 'ai-multilingual' ) }</th>
-							<th scope="col">{ __( 'Source', 'ai-multilingual' ) }</th>
-							<th scope="col">{ __( 'Translation', 'ai-multilingual' ) }</th>
-							<th scope="col">{ __( 'Status', 'ai-multilingual' ) }</th>
-							<th scope="col">{ __( 'Actions', 'ai-multilingual' ) }</th>
-						</tr>
-					</thead>
-					<tbody>
-						{ items.map( ( item ) => (
-							<ReviewQueueRow
-								key={ queueItemKey( item ) }
-								item={ item }
-								languages={ languages }
-								selected={ selectedKeys.has( queueItemKey( item ) ) }
-								selectable={ isQueueItemSelectable( item ) }
-								canTranslate={ canTranslate }
-								onToggleSelect={ ( key, checked ) =>
-									setSelectedKeys( ( current ) =>
-										toggleQueueSelection( current, key, checked )
-									)
-								}
-								onApprove={ ( target ) =>
-									openDialog( [ target ], 'approve' )
-								}
-								onReject={ ( target ) =>
-									openDialog( [ target ], 'reject' )
-								}
-								onOpenInEditor={ onOpenInEditor }
-								onOpenInOperations={ onOpenInOperations }
-							/>
-						) ) }
-					</tbody>
-				</table>
-			) }
+			{ ! loading &&
+				! error &&
+				groups.map( ( group ) => (
+					<ReviewObjectGroup
+						key={ `${ group.post_id }:${ group.language_id }` }
+						group={ group }
+						languages={ languages }
+						canTranslate={ canTranslate }
+						busy={ busy || null !== dialog }
+						selectedKeys={ selectedKeys }
+						onToggleSelect={ ( key, checked ) =>
+							setSelectedKeys( ( current ) =>
+								toggleQueueSelection( current, key, checked )
+							)
+						}
+						onApproveRow={ ( item ) =>
+							openDialog(
+								[ item ],
+								'approve',
+								groupLanguageCode( group )
+							)
+						}
+						onRejectRow={ ( item ) =>
+							openDialog(
+								[ item ],
+								'reject',
+								groupLanguageCode( group )
+							)
+						}
+						onApproveSelected={ ( target ) =>
+							openDialog(
+								selectedItemsInGroup( target ),
+								'approve',
+								groupLanguageCode( target )
+							)
+						}
+						onRejectSelected={ ( target ) =>
+							openDialog(
+								selectedItemsInGroup( target ),
+								'reject',
+								groupLanguageCode( target )
+							)
+						}
+						onApproveObject={ handleApproveObject }
+						onOpenInEditor={ onOpenInEditor }
+						onOpenInOperations={ onOpenInOperations }
+					/>
+				) ) }
 
-			{ ! loading && ! error && items.length > 0 && (
+			{ ! loading && ! error && totalPages > 1 && (
 				<div
 					className="aiml-review-queue-pagination"
 					role="navigation"
-					aria-label={ __( 'Review queue pagination', 'ai-multilingual' ) }
+					aria-label={ __(
+						'Review queue pagination',
+						'ai-multilingual'
+					) }
 				>
 					<Button
 						variant="secondary"
-						onClick={ () => setPage( ( current ) => Math.max( 1, current - 1 ) ) }
+						onClick={ () =>
+							setPage( ( current ) => Math.max( 1, current - 1 ) )
+						}
 						disabled={ page <= 1 }
 					>
 						{ __( 'Previous', 'ai-multilingual' ) }
@@ -402,7 +396,9 @@ export default function ReviewQueuePanel( {
 					<Button
 						variant="secondary"
 						onClick={ () =>
-							setPage( ( current ) => Math.min( totalPages, current + 1 ) )
+							setPage( ( current ) =>
+								Math.min( totalPages, current + 1 )
+							)
 						}
 						disabled={ page >= totalPages }
 					>
@@ -422,7 +418,7 @@ export default function ReviewQueuePanel( {
 						)
 					}
 					onConfirm={ confirmDialog }
-					onCancel={ closeDialog }
+					onCancel={ () => setDialog( null ) }
 					busy={ dialog.busy }
 					errorMessage={ dialog.error }
 				/>

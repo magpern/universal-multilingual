@@ -2,6 +2,7 @@ import { Button } from '@wordpress/components';
 import { __, sprintf } from '@wordpress/i18n';
 
 import type { LanguageOption, ReviewQueueItem } from '../types/view-models';
+import { fieldLabel } from '../utils/field-labels';
 import { languageCodeForId, queueItemKey } from '../utils/review-queue';
 import { segmentStatusLabel } from '../utils/segment-status';
 import ReviewMetaSummary from './ReviewMetaSummary';
@@ -13,6 +14,8 @@ interface ReviewQueueRowProps {
 	selected: boolean;
 	selectable: boolean;
 	canTranslate: boolean;
+	/** Inside an object group the post identity lives in the card header. */
+	hideObjectColumn?: boolean;
 	onToggleSelect: ( key: string, checked: boolean ) => void;
 	onApprove: ( item: ReviewQueueItem ) => void;
 	onReject: ( item: ReviewQueueItem ) => void;
@@ -26,6 +29,7 @@ export default function ReviewQueueRow( {
 	selected,
 	selectable,
 	canTranslate,
+	hideObjectColumn = false,
 	onToggleSelect,
 	onApprove,
 	onReject,
@@ -71,36 +75,50 @@ export default function ReviewQueueRow( {
 					</span>
 				) }
 			</td>
+			{ ! hideObjectColumn && (
+				<td>
+					{ item.post_id }
+					{ canTranslate && (
+						<Button
+							variant="link"
+							onClick={ () =>
+								onOpenInEditor( item.post_id, languageCode )
+							}
+						>
+							{ __( 'Open in editor', 'ai-multilingual' ) }
+						</Button>
+					) }
+				</td>
+			) }
+			{ ! hideObjectColumn && (
+				<td>{ languageCode || item.language_id }</td>
+			) }
 			<td>
-				{ item.post_id }
-				{ canTranslate && (
-					<Button
-						variant="link"
-						onClick={ () =>
-							onOpenInEditor( item.post_id, languageCode )
-						}
-					>
-						{ __( 'Open in editor', 'ai-multilingual' ) }
-					</Button>
-				) }
-				{ onOpenInOperations && item.translation_id > 0 && (
-					<Button
-						variant="link"
-						onClick={ () =>
-							onOpenInOperations(
-								item.translation_id,
-								languageCode
-							)
-						}
-					>
-						{ __( 'Open in Operations', 'ai-multilingual' ) }
-					</Button>
-				) }
+				<span className="aiml-review-queue-row__field">
+					{ fieldLabel( item ) }
+				</span>
+				<details className="aiml-review-queue-row__technical">
+					<summary>
+						{ __( 'Technical details', 'ai-multilingual' ) }
+					</summary>
+					<code>{ item.segment_key }</code>
+					{ onOpenInOperations && item.translation_id > 0 && (
+						<Button
+							variant="link"
+							onClick={ () =>
+								onOpenInOperations(
+									item.translation_id,
+									languageCode
+								)
+							}
+						>
+							{ __( 'Open in Operations', 'ai-multilingual' ) }
+						</Button>
+					) }
+				</details>
 			</td>
-			<td>{ languageCode || item.language_id }</td>
 			<td>
 				<p className="aiml-workspace-readonly">{ item.source_text }</p>
-				<div className="aiml-workspace-meta">{ item.segment_key }</div>
 			</td>
 			<td>
 				<p className="aiml-workspace-readonly">

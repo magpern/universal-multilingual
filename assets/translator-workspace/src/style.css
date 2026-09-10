@@ -367,6 +367,112 @@
 	margin-top: 1rem;
 }
 
+.aiml-translator-workspace .aiml-review-object-group {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-left: 4px solid #949494;
+	border-radius: 4px;
+	margin: 1rem 0;
+	padding: 1rem 1.25rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-group--success {
+	border-left-color: #2a8a44;
+}
+
+.aiml-translator-workspace .aiml-review-object-group--warning {
+	border-left-color: #bd8600;
+}
+
+.aiml-translator-workspace .aiml-review-object-group--info {
+	border-left-color: #2271b1;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__header {
+	align-items: flex-start;
+	display: flex;
+	gap: 1rem;
+	justify-content: space-between;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__title {
+	margin: 0;
+	font-size: 1.05rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__meta {
+	color: #646970;
+	margin: 0.15rem 0 0;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__chip {
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	padding: 0.15rem 0.6rem;
+	white-space: nowrap;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__chip--success {
+	background: #edf7ed;
+	color: #1e6b32;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__chip--warning {
+	background: #fcf3e3;
+	color: #8a6100;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__chip--info {
+	background: #e7f0f7;
+	color: #1c5a8f;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__summary {
+	font-weight: 600;
+	margin: 0.5rem 0 0.75rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__actions {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 0.75rem;
+	margin-bottom: 0.75rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__fields > summary {
+	color: #646970;
+	cursor: pointer;
+	font-size: 0.85rem;
+	margin-bottom: 0.5rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-group__skipped {
+	margin: 0.4rem 0 0 1rem;
+}
+
+.aiml-translator-workspace .aiml-review-queue-row__field {
+	font-weight: 600;
+}
+
+.aiml-translator-workspace .aiml-review-queue-row__technical {
+	margin-top: 0.35rem;
+}
+
+.aiml-translator-workspace .aiml-review-queue-row__technical > summary {
+	color: #646970;
+	cursor: pointer;
+	font-size: 0.8rem;
+}
+
+.aiml-translator-workspace .aiml-review-queue-row__technical code {
+	display: block;
+	font-size: 0.8rem;
+	margin-top: 0.25rem;
+	word-break: break-all;
+}
+
 .aiml-translator-workspace .aiml-jobs-health-banner {
 	display: grid;
 	gap: 0.75rem;

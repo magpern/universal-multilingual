@@ -1,4 +1,9 @@
-import type { LanguageOption, ReviewQueueItem } from '../types/view-models';
+import type {
+	LanguageOption,
+	ReviewObjectGroup,
+	ReviewQueueItem,
+	ReviewQueueResponse,
+} from '../types/view-models';
 
 /**
  * The review queue can span multiple posts and languages, so a segment key
@@ -111,6 +116,58 @@ export function groupSelectedByPostLanguage(
 				items: [ item ],
 			} );
 		}
+	}
+
+	return Array.from( groups.values() );
+}
+
+/**
+ * The queue is reviewed object-first (CONTENT OBJECT -> LANGUAGE -> FIELDS).
+ * Prefer the server's `objects` block (it carries the completeness summary,
+ * which is global to the object, not just the current page); fall back to a
+ * shallow client grouping only when an older payload omits it.
+ *
+ * @param response Review queue REST response.
+ * @return One group per object + language.
+ */
+export function groupQueueByObject(
+	response: ReviewQueueResponse
+): ReviewObjectGroup[] {
+	if ( Array.isArray( response.objects ) ) {
+		return response.objects;
+	}
+
+	const groups = new Map< string, ReviewObjectGroup >();
+	for ( const item of response.items ) {
+		const groupKey = `${ item.post_id }:${ item.language_id }`;
+		const existing = groups.get( groupKey );
+		if ( existing ) {
+			existing.items.push( item );
+			continue;
+		}
+		groups.set( groupKey, {
+			post_id: item.post_id,
+			post_title: item.post_title ?? String( item.post_id ),
+			post_type: item.post_type ?? '',
+			object_noun: 'Post',
+			post_status: '',
+			language_id: item.language_id,
+			language_code: '',
+			language_name: '',
+			edit_link: '',
+			summary: {
+				total: 0,
+				approved: 0,
+				pending: 0,
+				rejected: 0,
+				untranslated: 0,
+				stale: 0,
+				translated: 0,
+				state: 'ready',
+				is_fully_reviewed: false,
+			},
+			items: [ item ],
+		} );
 	}
 
 	return Array.from( groups.values() );

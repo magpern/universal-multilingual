@@ -1709,12 +1709,35 @@ final class WorkspaceService {
 			$post_type = (string) $post->post_type;
 			$label_map = $this->assembled_label_map_by_language( $post, array_keys( $by_object[ $object_id ] ?? array() ) );
 
+			// Every eligible target language is a first-class tab on the card —
+			// even one with zero review rows — so a forgotten / untranslated
+			// language is never hidden (ADR-0034 C1/D3). One
+			// ObjectLanguageStatus per target, computed once and reused for the
+			// M-wide summary.
+			$all_targets      = $this->eligible_target_languages();
+			$status_by_lang   = array();
+			$summary_statuses = array();
+			foreach ( $all_targets as $language ) {
+				$status = $this->object_language_status( $post, $language );
+				$status_by_lang[ (int) $language->language_id ] = $status;
+				$summary_statuses[]                             = $status;
+			}
+
+			$tab_targets = $all_targets;
+			if ( array() !== $language_ids ) {
+				$wanted      = array_flip( $language_ids );
+				$tab_targets = array_values(
+					array_filter(
+						$all_targets,
+						static fn( object $language ): bool => isset( $wanted[ (int) $language->language_id ] )
+					)
+				);
+			}
+
 			$languages = array();
-			foreach ( (array) ( $by_object[ $object_id ] ?? array() ) as $language_id => $language_rows ) {
-				$language = $this->languages->find( (int) $language_id );
-				if ( null === $language ) {
-					continue;
-				}
+			foreach ( $tab_targets as $language ) {
+				$language_id   = (int) $language->language_id;
+				$language_rows = (array) ( $by_object[ $object_id ][ $language_id ] ?? array() );
 
 				$items = array();
 				foreach ( $language_rows as $row ) {
@@ -1723,7 +1746,7 @@ final class WorkspaceService {
 						(string) ( $row->field_key ?? '' ),
 						$key,
 						$post_type,
-						(string) ( $label_map[ (int) $language_id ][ $key ] ?? '' )
+						(string) ( $label_map[ $language_id ][ $key ] ?? '' )
 					);
 					$row->post_title  = (string) $post->post_title;
 					$row->post_type   = $post_type;
@@ -1731,10 +1754,10 @@ final class WorkspaceService {
 				}
 
 				$languages[] = array(
-					'language_id'   => (int) $language_id,
+					'language_id'   => $language_id,
 					'language_code' => (string) ( $language->code ?? '' ),
 					'language_name' => (string) ( $language->name ?? '' ),
-					'summary'       => $this->object_language_status( $post, $language )->to_array(),
+					'summary'       => ( $status_by_lang[ $language_id ] ?? $this->object_language_status( $post, $language ) )->to_array(),
 					'items'         => $items,
 				);
 			}
@@ -1747,12 +1770,7 @@ final class WorkspaceService {
 				'post_status'              => (string) $post->post_status,
 				'edit_link'                => (string) get_edit_post_link( (int) $post->ID, 'raw' ),
 				'languages'                => $languages,
-				'object_languages_summary' => ObjectLanguagesSummary::from_statuses(
-					array_map(
-						fn( object $language ): ObjectLanguageStatus => $this->object_language_status( $post, $language ),
-						$this->eligible_target_languages()
-					)
-				)->to_array(),
+				'object_languages_summary' => ObjectLanguagesSummary::from_statuses( $summary_statuses )->to_array(),
 			);
 		}
 

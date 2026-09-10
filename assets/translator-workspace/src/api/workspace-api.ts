@@ -10,6 +10,7 @@ import type {
 	ApproveObjectResult,
 	ApproveObjectLanguagesResult,
 	ObjectLanguagesResponse,
+	TranslateObjectsResult,
 	ReviewErrorContext,
 	ReviewQueueResponse,
 	SegmentQA,
@@ -363,6 +364,43 @@ export async function fetchObjectLanguages(
 	return apiFetch< ObjectLanguagesResponse >( {
 		path: path( `workspace/${ postId }/languages` ),
 	} );
+}
+
+/**
+ * MLW1a — create one background translation job per (object × language) for the
+ * given objects and target languages under one batch (ADR-0034 D7).
+ *
+ * @param payload                      Object ids, language ids, job type, and the published-language
+ *                                     acknowledgement when any target language is already published.
+ * @param payload.objectIds
+ * @param payload.languageIds
+ * @param payload.jobType
+ * @param payload.acknowledgePublished
+ * @param payload.clientToken
+ */
+export async function translateObjects( payload: {
+	objectIds: number[];
+	languageIds: number[];
+	jobType?: 'missing' | 'stale' | 'machine';
+	acknowledgePublished?: boolean;
+	clientToken?: string;
+} ): Promise< TranslateObjectsResult > {
+	try {
+		return await apiFetch< TranslateObjectsResult >( {
+			path: path( 'workspace/objects/translate' ),
+			method: 'POST',
+			data: {
+				object_ids: payload.objectIds,
+				language_ids: payload.languageIds,
+				job_type: payload.jobType ?? 'missing',
+				automatic: false,
+				acknowledge_published: payload.acknowledgePublished,
+				client_token: payload.clientToken,
+			},
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
 }
 
 export async function deleteTranslation(

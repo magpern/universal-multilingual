@@ -285,24 +285,28 @@ aiml_check( 'Danish listed as a forgotten language', in_array( $da->code, (array
 $d_states = array_column( (array) $d['data']['languages'], 'state', 'language_code' );
 aiml_check( 'Danish state = not_translated', 'not_translated' === ( $d_states[ $da->code ] ?? '' ), wp_json_encode( $d_states ) );
 
-// == E — review queue: one object card, all languages =========================
-echo "\nE. Review Queue — one object card, three language tabs\n";
+// == E — review queue: one object card, ALL target languages =================
+echo "\nE. Review Queue — one object card, every target language a first-class tab\n";
 $page_e = aiml_page( 'MLW1a AC E page', '' );
+// Only Swedish is submitted for review — German + Danish must still be tabs.
 aiml_seed( $store, $page_e, (int) $sv->language_id );
-aiml_seed( $store, $page_e, (int) $de->language_id );
-aiml_seed( $store, $page_e, (int) $da->language_id );
 $e = aiml_rest( 'GET', '/aiml/v1/workspace/review-queue', array( 'per_page' => 50, 'review_status' => 'pending' ), $admin );
-echo '  DEBUG E status=' . $e['status'] . ' keys=' . wp_json_encode( is_array( $e['data'] ) ? array_keys( $e['data'] ) : gettype( $e['data'] ) ) . "\n";
-if ( is_array( $e['data'] ) && isset( $e['data']['code'] ) ) { echo '  DEBUG E error: ' . wp_json_encode( $e['data'] ) . "\n"; }
 $e_cards = array_values( array_filter( (array) ( $e['data']['object_groups'] ?? array() ), static fn( $g ): bool => (int) $g['post_id'] === $page_e ) );
-if ( 0 === count( $e_cards ) ) { echo '  DEBUG object_groups: ' . wp_json_encode( array_slice( (array) ( $e['data']['object_groups'] ?? 'MISSING KEY' ), 0, 3 ) ) . ' object_total=' . wp_json_encode( $e['data']['object_total'] ?? null ) . ' legacy_objects=' . count( (array) ( $e['data']['objects'] ?? array() ) ) . "\n"; }
 aiml_check( 'exactly one object card for the page', 1 === count( $e_cards ), wp_json_encode( array_column( (array) $e['data']['object_groups'], 'post_id' ) ) );
 if ( 1 === count( $e_cards ) ) {
-	$card_langs = array_column( (array) $e_cards[0]['languages'], 'language_code' );
+	$by_code = array();
+	foreach ( (array) $e_cards[0]['languages'] as $lang ) {
+		$by_code[ $lang['language_code'] ] = $lang;
+	}
+	$card_langs = array_keys( $by_code );
 	sort( $card_langs );
 	$want = array( $sv->code, $de->code, $da->code );
 	sort( $want );
-	aiml_check( 'all three languages nested under the one card', $want === $card_langs, wp_json_encode( $card_langs ) );
+	aiml_check( 'every target language nested under the one card', $want === $card_langs, wp_json_encode( $card_langs ) );
+	aiml_check( 'Swedish tab has review items', ! empty( $by_code[ $sv->code ]['items'] ) );
+	aiml_check( 'German tab present with 0 items (not hidden)', array() === (array) ( $by_code[ $de->code ]['items'] ?? null ) && isset( $by_code[ $de->code ] ) );
+	aiml_check( 'German tab carries a server state (not_translated)', 'not_translated' === ( $by_code[ $de->code ]['summary']['state'] ?? '' ) );
+	aiml_check( 'card summary flags a forgotten language', true === ( $e_cards[0]['object_languages_summary']['forgotten'] ?? false ) );
 	aiml_check( 'object_total counts objects, not segments', (int) ( $e['data']['object_total'] ?? 0 ) >= 1 );
 }
 

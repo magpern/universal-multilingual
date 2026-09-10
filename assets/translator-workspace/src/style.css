@@ -1013,3 +1013,18 @@
 	font-weight: 600;
 	margin: 0 0 0.5rem;
 }
+
+/* MLW1a — "Translate all selected languages with AI" action (WP3/WP4). */
+
+.aiml-translator-workspace .aiml-workspace-translate-all {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin: 0.5rem 0 0.25rem;
+}
+
+.aiml-translator-workspace .aiml-workspace-translate-all__hint {
+	color: #646970;
+	font-size: 0.85em;
+}

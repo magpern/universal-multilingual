@@ -185,6 +185,19 @@ export interface ReviewObjectCard {
 	object_languages_summary: ObjectLanguagesSummary;
 }
 
+export interface TranslateObjectsResult {
+	batch_id: string;
+	planned: {
+		objects: number;
+		languages: number;
+		operations: number;
+		chunks: number;
+	};
+	created: number;
+	failed: unknown[];
+	autostarted: boolean;
+}
+
 export interface ReviewQueueResponse {
 	items: ReviewQueueItem[];
 	objects?: ReviewObjectGroup[];

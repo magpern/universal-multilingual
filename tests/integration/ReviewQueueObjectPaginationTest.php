@@ -88,6 +88,42 @@ final class ReviewQueueObjectPaginationTest extends AimlTestCase {
 		$this->assertCount( 2, $result['object_ids'] );
 	}
 
+	public function test_card_shows_every_target_language_even_with_no_review_rows(): void {
+		$sv   = $this->add_language( 'sv', 'sv_SE' );
+		$de   = $this->add_language( 'de', 'de_DE' );
+		$da   = $this->add_language( 'da', 'da_DK' );
+		$page = $this->create_page( 'About page', '<p>Body.</p>' );
+
+		// Only Swedish has anything submitted for review.
+		$this->seed_row( (int) $page->ID, (int) $sv->language_id, 'post_title', 'Om sidan' );
+
+		wp_set_current_user( $this->create_reviewer() );
+		$request = new WP_REST_Request( 'GET', '/aiml/v1/workspace/review-queue' );
+		$request->set_param( 'per_page', 50 );
+		$data = rest_do_request( $request )->get_data();
+
+		$card = null;
+		foreach ( (array) ( $data['object_groups'] ?? array() ) as $group ) {
+			if ( (int) $group['post_id'] === (int) $page->ID ) {
+				$card = $group;
+			}
+		}
+		$this->assertNotNull( $card, 'the object appears as an object_groups card' );
+
+		$by_code = array();
+		foreach ( $card['languages'] as $lang ) {
+			$by_code[ $lang['language_code'] ] = $lang;
+		}
+		$this->assertArrayHasKey( 'sv', $by_code );
+		$this->assertArrayHasKey( 'de', $by_code, 'German is a first-class tab even with zero review rows' );
+		$this->assertArrayHasKey( 'da', $by_code, 'Danish is a first-class tab even with zero review rows' );
+
+		$this->assertNotEmpty( $by_code['sv']['items'] );
+		$this->assertSame( array(), $by_code['de']['items'] );
+		$this->assertSame( 'not_translated', $by_code['de']['summary']['state'] );
+		$this->assertTrue( (bool) $card['object_languages_summary']['forgotten'] );
+	}
+
 	public function test_object_pagination_is_stable_with_tied_timestamps(): void {
 		$sv    = $this->add_language( 'sv', 'sv_SE' );
 		$stamp = gmdate( 'Y-m-d H:i:s' );

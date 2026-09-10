@@ -20,6 +20,7 @@ import {
 	suggestSegment,
 	translateBatch,
 	fetchObjectLanguages,
+	translateObjects,
 } from './api/workspace-api';
 import BulkToolbar from './components/BulkToolbar';
 import LanguageChecklist from './components/LanguageChecklist';
@@ -235,6 +236,7 @@ export default function App() {
 	>( () => defaultSelection( languages ) );
 	const [ objectLanguages, setObjectLanguages ] =
 		useState< ObjectLanguagesResponse | null >( null );
+	const [ translatingAll, setTranslatingAll ] = useState( false );
 	const segmentCacheRef = useRef< LanguageSegmentCache >( emptyCache() );
 
 	const dirtyCount = useMemo( () => countDirtyRows( rows ), [ rows ] );
@@ -1109,6 +1111,9 @@ export default function App() {
 		languageStatusByCode[ entry.language_code ] = entry;
 	}
 
+	const canTranslateAllSelected =
+		Boolean( postId ) && canManageJobs && languageTabs.length > 1;
+
 	const handleSelectedLanguagesChange = ( next: string[] ) => {
 		setSelectedLanguageCodes( next );
 		if ( next.length > 0 && ! next.includes( languageCode ) ) {
@@ -1121,6 +1126,86 @@ export default function App() {
 		// stays put (ADR-0034 D1 / WP3).
 		setLanguageCode( code );
 		setSegmentFilter( 'all' );
+	};
+
+	// MLW1a (WP3/WP4): "Translate all selected languages with AI" — one batch of
+	// (object × language) jobs via POST /workspace/objects/translate.
+	const handleTranslateAllSelected = async () => {
+		if ( ! postId || 0 === languageTabs.length ) {
+			return;
+		}
+		const languageIds = languageTabs
+			.map(
+				( tab ) =>
+					languages.find( ( l ) => l.code === tab.code )
+						?.language_id ?? 0
+			)
+			.filter( ( id ) => id > 0 );
+		if ( 0 === languageIds.length ) {
+			return;
+		}
+
+		const publishedTargets = languages
+			.filter(
+				( l ) =>
+					languageTabs.some( ( tab ) => tab.code === l.code ) &&
+					l.status === 'published'
+			)
+			.map( ( l ) => l.native_name || l.name || l.code );
+
+		if ( publishedTargets.length > 0 ) {
+			const acknowledged = await requestConfirm( {
+				title: __( 'Published language', 'ai-multilingual' ),
+				message: sprintf(
+					/* translators: %s: comma-separated language names */
+					__(
+						'%s already published. New translations for these languages may become visible to visitors immediately under the site policy. Continue?',
+						'ai-multilingual'
+					),
+					publishedTargets.join( ', ' )
+				),
+				confirmLabel: __( 'Translate anyway', 'ai-multilingual' ),
+			} );
+			if ( ! acknowledged ) {
+				return;
+			}
+		}
+
+		setTranslatingAll( true );
+		setError( '' );
+		setBatchMessage( '' );
+		try {
+			const result = await translateObjects( {
+				objectIds: [ postId ],
+				languageIds,
+				jobType: 'missing',
+				acknowledgePublished:
+					publishedTargets.length > 0 ? true : undefined,
+			} );
+			setBatchMessage(
+				sprintf(
+					/* translators: 1: language count, 2: batch id */
+					__(
+						'Translating %1$d languages with AI — batch %2$s. Track progress on the Jobs view.',
+						'ai-multilingual'
+					),
+					result.planned.languages,
+					result.batch_id
+				)
+			);
+			void refreshObjectLanguages();
+		} catch ( unknownError ) {
+			setError(
+				unknownError instanceof Error
+					? unknownError.message
+					: __(
+							'Could not start the multi-language translation.',
+							'ai-multilingual'
+					  )
+			);
+		} finally {
+			setTranslatingAll( false );
+		}
 	};
 
 	return (
@@ -1305,6 +1390,33 @@ export default function App() {
 									void refreshObjectLanguages();
 								} }
 							/>
+							{ canTranslateAllSelected && (
+								<div className="aiml-workspace-translate-all">
+									<Button
+										variant="secondary"
+										isBusy={ translatingAll }
+										disabled={ translatingAll }
+										onClick={ () => {
+											void handleTranslateAllSelected();
+										} }
+									>
+										{ sprintf(
+											/* translators: %d: selected language count */
+											__(
+												'Translate all selected languages with AI (%d)',
+												'ai-multilingual'
+											),
+											languageTabs.length
+										) }
+									</Button>
+									<span className="aiml-workspace-translate-all__hint">
+										{ __(
+											'Translate missing segments in every selected language — one background batch.',
+											'ai-multilingual'
+										) }
+									</span>
+								</div>
+							) }
 							{ previewError && (
 								<Notice status="error" isDismissible={ false }>
 									{ previewError }

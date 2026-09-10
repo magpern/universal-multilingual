@@ -27,7 +27,9 @@ and `docs/adr/0034-multi-language-workflow.md` (Accepted).
   tab strip switches the active language **without reloading the object**, with
   a per-tab state badge and a per-language segment cache. An
   `ObjectLanguagesBar` shows the ready count and calls out not-translated
-  languages.
+  languages. A **"Translate all selected languages with AI"** action creates
+  one background batch of (object × language) jobs, with a published-language
+  confirmation when a selected target is already published.
 - **N objects × M languages translation.** New
   `POST aiml/v1/workspace/objects/translate` builds the (object × language)
   cross-product, chunks it to ≤ 50 jobs per call under **one background
@@ -36,8 +38,10 @@ and `docs/adr/0034-multi-language-workflow.md` (Accepted).
   one failing object rejects the whole request with **zero jobs created**.
 - **Review Queue grouped by object.** The queue paginates distinct **objects**
   (grouped SQL, `COUNT(DISTINCT source_id)` total) — one object's languages are
-  never split across pages. Each card shows every target language together with
-  its state. **"Approve all ready languages"** approves the whole pending set
+  never split across pages. Each card shows **every** eligible target language
+  as a first-class tab — including one with zero review rows, so a forgotten /
+  untranslated language is never hidden. **"Approve all ready languages"**
+  approves the whole pending set
   for every clean language (bounded chunks — no first-50 truncation);
   needs-attention languages are reported as skipped, never silently approved.
 - **Site Translate N×M matrix.** Site Translate gains a target-language

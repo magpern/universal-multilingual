@@ -21,6 +21,7 @@ PO functional sign-off. NOT merged, NOT tagged, NOT released, PROD untouched.
 | WP6 | `feat(mlw1a): object-first Review Queue UI with per-language tabs` |
 | WP7 | `feat(mlw1a): Site Translate N objects × M languages matrix` |
 | WP8 | `docs(mlw1a): CHANGELOG + user manual` · `test(mlw1a): DEV acceptance + closure` |
+| review | `fix(mlw1a): Workspace "translate all selected languages" + Review Queue all-language tabs` (PR #69 review) |
 
 ## Frozen architecture decisions honoured
 
@@ -85,9 +86,11 @@ PO functional sign-off. NOT merged, NOT tagged, NOT released, PROD untouched.
 Run on `https://dev.biopentra.eu`, branch `feature/mlw1a-multi-language-workflow`
 deployed to the bind-mounted DEV checkout, WordPress restarted.
 
-**RESULT: 48 passed, 0 failed.** Fixtures created and torn down cleanly; DEV
-returned to its 3 real languages (`en`, `sv`, `de`), `aiml_db_version` 10,
-`schema_version` 3, public listeners exactly `2222/80/443`.
+**RESULT: 52 passed, 0 failed** (48 at first DEV pass; +4 after the PR-review
+fix added the all-language-tab assertions to scenario E). Fixtures created and
+torn down cleanly; DEV returned to its 3 real languages (`en`, `sv`, `de`),
+`aiml_db_version` 10, `schema_version` 3, public listeners exactly
+`2222/80/443`.
 
 | Scenario | Verified |
 |---|---|
@@ -95,7 +98,7 @@ returned to its 3 real languages (`en`, `sv`, `de`), `aiml_db_version` 10,
 | **B** — translate all selected languages | 3 (object,language) jobs under one `batch_id`, one per selected language, autostart requested. |
 | **C** — translate current language only | translating German leaves the Swedish + Danish translation hashes byte-identical; only the German pair's job is created. |
 | **D** — forgotten language | `target_count` = every configured target (M, not the selected subset); `forgotten: true`; Danish in `forgotten_languages`; Danish `state = not_translated`. |
-| **E** — Review Queue one card | exactly one `object_groups` card for the page; all three languages nested under it; `object_total` is an object count. |
+| **E** — Review Queue one card | exactly one `object_groups` card for the page; **every** eligible target language nested under it as a first-class tab — a language with zero review rows still has a tab carrying its server `state` (`not_translated`) and empty `items[]`, and the card summary flags it as forgotten; `object_total` is an object count. |
 | **F** — approve all ready languages | Swedish + German approved; Danish (a rejected row → `needs_attention`) reported as skipped, not approved; object `not_fully_reviewed`; Swedish pending rows cleared. |
 | **G** — Site Translate 5 × 3 | pre-run `operations` = 15; 15 child jobs, one batch, one job per (object, language) pair. |
 | **H** — >50 in two languages | 55 real block segments seeded pending in Swedish + German (57 pending each incl. title/excerpt); "Approve all ready languages" leaves **0** pending in both; per-language `approved_count` > 50 — no first-50 truncation. |

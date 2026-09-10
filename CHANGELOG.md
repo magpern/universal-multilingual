@@ -5,6 +5,20 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-09-10
+
+### Fixed
+
+- A background translation job created by **Translate with AI** /
+  **Translate selected with AI** now runs to completion. The worker
+  processes segments in bounded wakes of `MAX_ITEMS_PER_WAKE` (10); when
+  claimable segments remained it returned without scheduling the next
+  wake, and the hourly sweep only recovers crashed jobs — so a page with
+  more than 10 translatable segments translated the first 10 and then
+  stalled. `BackgroundTranslationWorker` now re-enqueues its own next wake
+  while claimable items remain (guarded so a zero-progress wake cannot
+  hot-loop). No schema or settings change.
+
 ## [1.15.0] - 2026-09-10
 
 ### Added

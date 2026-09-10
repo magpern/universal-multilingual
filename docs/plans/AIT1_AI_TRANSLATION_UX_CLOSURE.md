@@ -38,10 +38,15 @@
 7. **Discoverability:** legacy `Editor.php` bridges into the Workspace AI flow;
    Pages/Posts list-table bulk action; Plugins-row **Settings | Overview** +
    **Documentation** links.
+8. **Shared internal navigation** (`.aiml-ui-subnav`, `src/Admin/AdminNavigation`)
+   at the top of all eight Universal Multilingual admin screens — each tab maps
+   to the owning screen's existing slug constant + existing capability;
+   inaccessible sections are omitted; no JS; active tab marked by an accent pill
+   + `aria-current="page"`.
 
 ## Gates (green — see validation log)
 
-PHP unit **1064/1064** · PHP integration **1048/1048** · PHPCS **clean**
+PHP unit **1073/1073** · PHP integration **1055/1055** · PHPCS **clean**
 (errors + warnings) · Jest **110/110** · workspace build **ok** ·
 build zip + audit zip **PASS**.
 

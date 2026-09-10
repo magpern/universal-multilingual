@@ -1,6 +1,9 @@
 # ADR-0034 — Multi-language ("object × language") translation workflow
 
-**Status:** Accepted (2026-09-10, MLW1a)
+**Status:** Accepted (2026-09-10, MLW1a). **Implemented** on
+`feature/mlw1a-multi-language-workflow` (WP0–WP8), DEV-accepted 48/48 — see
+[`docs/plans/MLW1A_MULTI_LANGUAGE_WORKFLOW_CLOSURE.md`](../plans/MLW1A_MULTI_LANGUAGE_WORKFLOW_CLOSURE.md).
+Not merged / tagged / released.
 **Relates to:** ADR-0015 (review workflow), ADR-0020 (segment publication gate),
 ADR-0031 (user-initiated AI translation), ADR-0033 (object-level review). Builds
 on all of them — replaces none.

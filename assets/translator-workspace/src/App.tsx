@@ -142,6 +142,17 @@ export default function App() {
 			window.aimlTranslatorWorkspace.canAccessOperations ??
 			( window.aimlTranslatorWorkspace.canTranslate ||
 				window.aimlTranslatorWorkspace.canReview );
+		let urlView = '';
+		try {
+			urlView =
+				new URLSearchParams( window.location.search ).get( 'view' ) ??
+				'';
+		} catch ( e ) {
+			urlView = '';
+		}
+		if ( 'site-translate' === urlView && canManageJobs ) {
+			return 'site-translate';
+		}
 		if ( 'operations' === readOperationsUrlState().view && ops ) {
 			return 'operations';
 		}

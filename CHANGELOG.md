@@ -5,6 +5,64 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-09-11
+
+### Added — MLW1a multi-language workflow
+
+The translation workflow now scales to **many pages × many languages**.
+See `docs/plans/MLW1_MULTI_LANGUAGE_WORKFLOW_IMPLEMENTATION_PLAN.md` (FROZEN)
+and `docs/adr/0034-multi-language-workflow.md` (Accepted).
+
+- **Object × language completeness model.** New server-authoritative
+  `ObjectLanguageStatus` + `ObjectLanguagesSummary` compose the existing read
+  models (review counts, translation status, publish coverage, an active-job
+  probe, the language registry, a QA scan) into a canonical per-(object,
+  language) `state` and a **"N / M languages ready"** roll-up. `M` is every
+  configured target language — a language the operator never selected still
+  counts, so a forgotten language is always visible. PHP owns every state
+  decision; TypeScript renders it verbatim. New
+  `GET aiml/v1/workspace/{post_id}/languages`.
+- **Workspace multi-language load + tabs.** A "Languages to work on" checklist
+  (all targets by default) loads a page for many languages at once; a language
+  tab strip switches the active language **without reloading the object**, with
+  a per-tab state badge and a per-language segment cache. An
+  `ObjectLanguagesBar` shows the ready count and calls out not-translated
+  languages. A **"Translate all selected languages with AI"** action creates
+  one background batch of (object × language) jobs, with a published-language
+  confirmation when a selected target is already published.
+- **N objects × M languages translation.** New
+  `POST aiml/v1/workspace/objects/translate` builds the (object × language)
+  cross-product, chunks it to ≤ 50 jobs per call under **one background
+  batch**, and autostarts. Authorization checks `edit_post` on **every**
+  requested object (or `manage` jobs) in a body-reading permission callback —
+  one failing object rejects the whole request with **zero jobs created**.
+- **Review Queue grouped by object.** The queue paginates distinct **objects**
+  (grouped SQL, `COUNT(DISTINCT source_id)` total) — one object's languages are
+  never split across pages. Each card shows **every** eligible target language
+  as a first-class tab — including one with zero review rows, so a forgotten /
+  untranslated language is never hidden. **"Approve all ready languages"**
+  approves the whole pending set
+  for every clean language (bounded chunks — no first-50 truncation);
+  needs-attention languages are reported as skipped, never silently approved.
+- **Site Translate N×M matrix.** Site Translate gains a target-language
+  checklist and a pre-run **"P pages × Q languages = R translations"** count
+  (operations, not a cost estimate). Partial retry dedupes on
+  `(object, language)` — a page done in one language is still created for the
+  others.
+- **Published-language honesty.** MLW1a never changes a language's publication
+  status and never calls `PublicationService`. But a translation written into
+  an **already-published** language may become publicly visible under the
+  site's existing rendering policy, so every bulk / multi-language / N×M run
+  targeting a published language **requires an explicit acknowledgement** and
+  is rejected server-side without it.
+
+### Notes
+
+- **No schema change.** `Migrator::TARGET` 10, `Settings::SCHEMA_VERSION` 3
+  (both still guarded by `PluginGuardTest`).
+- Automatic AI translation mode is a separate future milestone (MLW1b) and is
+  explicitly rejected by `POST /workspace/objects/translate` in MLW1a.
+
 ## [1.17.0] - 2026-09-10
 
 ### Added

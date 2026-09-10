@@ -8,6 +8,9 @@ import type {
 } from '../types/segment-row';
 import type {
 	ApproveObjectResult,
+	ApproveObjectLanguagesResult,
+	ObjectLanguagesResponse,
+	TranslateObjectsResult,
 	ReviewErrorContext,
 	ReviewQueueResponse,
 	SegmentQA,
@@ -61,7 +64,11 @@ export class WorkspaceReviewConflictError extends Error {
 	public readonly code: string;
 	public readonly context: ReviewErrorContext;
 
-	public constructor( message: string, code: string, context: ReviewErrorContext ) {
+	public constructor(
+		message: string,
+		code: string,
+		context: ReviewErrorContext
+	) {
 		super( message );
 		this.name = 'WorkspaceReviewConflictError';
 		this.code = code;
@@ -181,9 +188,9 @@ function slugPath( postId: number, suffix = '' ): string {
 export async function fetchSlugRouteView(
 	postId: number,
 	language: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -197,9 +204,9 @@ export async function fetchSlugRouteView(
 export async function generateSlugCandidate(
 	postId: number,
 	language: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId, '/generate' ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -213,9 +220,9 @@ export async function generateSlugCandidate(
 export async function ensureSlugCandidate(
 	postId: number,
 	language: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId, '/ensure' ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -230,9 +237,9 @@ export async function saveSlugCandidate(
 	postId: number,
 	language: string,
 	slugCandidate: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -247,9 +254,9 @@ export async function saveSlugCandidate(
 export async function clearSlugCandidate(
 	postId: number,
 	language: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -263,9 +270,9 @@ export async function clearSlugCandidate(
 export async function publishSlugRoute(
 	postId: number,
 	language: string
-): Promise<SlugRouteView> {
+): Promise< SlugRouteView > {
 	try {
-		return await apiFetch<SlugRouteView>( {
+		return await apiFetch< SlugRouteView >( {
 			path:
 				slugPath( postId, '/publish-route' ) +
 				`?language=${ encodeURIComponent( language ) }`,
@@ -287,10 +294,7 @@ function parseConflict( error: unknown ): WorkspaceConflictError | null {
 		segments?: WorkspaceSegment[];
 	};
 
-	const segments =
-		candidate?.data?.segments ??
-		candidate?.segments ??
-		[];
+	const segments = candidate?.data?.segments ?? candidate?.segments ?? [];
 
 	if ( candidate?.code === 'aiml_source_hash_mismatch' ) {
 		return new WorkspaceConflictError(
@@ -346,6 +350,57 @@ export async function fetchSegments(
 			) }`
 		),
 	} );
+}
+
+/**
+ * MLW1a — object × language completeness for one object across every eligible
+ * target language (ADR-0034). Every `state` is server-computed.
+ *
+ * @param postId Canonical post id.
+ */
+export async function fetchObjectLanguages(
+	postId: number
+): Promise< ObjectLanguagesResponse > {
+	return apiFetch< ObjectLanguagesResponse >( {
+		path: path( `workspace/${ postId }/languages` ),
+	} );
+}
+
+/**
+ * MLW1a — create one background translation job per (object × language) for the
+ * given objects and target languages under one batch (ADR-0034 D7).
+ *
+ * @param payload                      Object ids, language ids, job type, and the published-language
+ *                                     acknowledgement when any target language is already published.
+ * @param payload.objectIds
+ * @param payload.languageIds
+ * @param payload.jobType
+ * @param payload.acknowledgePublished
+ * @param payload.clientToken
+ */
+export async function translateObjects( payload: {
+	objectIds: number[];
+	languageIds: number[];
+	jobType?: 'missing' | 'stale' | 'machine';
+	acknowledgePublished?: boolean;
+	clientToken?: string;
+} ): Promise< TranslateObjectsResult > {
+	try {
+		return await apiFetch< TranslateObjectsResult >( {
+			path: path( 'workspace/objects/translate' ),
+			method: 'POST',
+			data: {
+				object_ids: payload.objectIds,
+				language_ids: payload.languageIds,
+				job_type: payload.jobType ?? 'missing',
+				automatic: false,
+				acknowledge_published: payload.acknowledgePublished,
+				client_token: payload.clientToken,
+			},
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
 }
 
 export async function deleteTranslation(
@@ -452,8 +507,7 @@ function parseQaBlocked( error: unknown ): WorkspaceQABlockedError | null {
 		const qa = candidate.qa ?? candidate.data?.qa;
 		if ( qa ) {
 			return new WorkspaceQABlockedError(
-				candidate.message ||
-					'Translation failed quality checks.',
+				candidate.message || 'Translation failed quality checks.',
 				{
 					issues: Array.isArray( qa.issues ) ? qa.issues : [],
 					summary: {
@@ -492,7 +546,10 @@ function parseReviewError( error: unknown ): Error {
 		if ( qa ) {
 			return new WorkspaceQABlockedError(
 				candidate.message ||
-					__( 'Translation failed quality checks.', 'ai-multilingual' ),
+					__(
+						'Translation failed quality checks.',
+						'ai-multilingual'
+					),
 				{
 					issues: Array.isArray( qa.issues ) ? qa.issues : [],
 					summary: {
@@ -520,7 +577,10 @@ function parseReviewError( error: unknown ): Error {
 	if ( code.indexOf( 'aiml_review_' ) === 0 || 'aiml_forbidden' === code ) {
 		return new WorkspaceReviewActionError(
 			candidate.message ||
-				__( 'The review action could not be completed.', 'ai-multilingual' ),
+				__(
+					'The review action could not be completed.',
+					'ai-multilingual'
+				),
 			code,
 			candidate.context ?? {}
 		);
@@ -541,9 +601,11 @@ export async function saveBatch(
 	} >
 ): Promise< BatchSaveResult > {
 	try {
-		const response = await apiFetch< BatchSaveResult & {
-			segments: WorkspaceSegment[];
-		} >( {
+		const response = await apiFetch<
+			BatchSaveResult & {
+				segments: WorkspaceSegment[];
+			}
+		>( {
 			path: path(
 				`workspace/${ postId }/segments/batch?language=${ encodeURIComponent(
 					languageCode
@@ -588,9 +650,11 @@ export async function translateBatch(
 			data.expected_translation_hashes = expectedTranslationHashes;
 		}
 
-		const response = await apiFetch< BatchTranslateResult & {
-			segments: WorkspaceSegment[];
-		} >( {
+		const response = await apiFetch<
+			BatchTranslateResult & {
+				segments: WorkspaceSegment[];
+			}
+		>( {
 			path: path(
 				`workspace/${ postId }/translate?language=${ encodeURIComponent(
 					languageCode
@@ -619,17 +683,19 @@ export async function translateBatch(
 /**
  * Publishes one post-backed segment (TI.7 manual path).
  *
- * @param postId                 Post id.
- * @param languageCode           Target language code.
- * @param segmentKey             Segment key.
- * @param expectedPublishStatus  Optimistic publish_status guard.
+ * @param postId                Post id.
+ * @param languageCode          Target language code.
+ * @param segmentKey            Segment key.
+ * @param expectedPublishStatus Optimistic publish_status guard.
  */
 export async function publishSegment(
 	postId: number,
 	languageCode: string,
 	segmentKey: string,
 	expectedPublishStatus: string
-): Promise< WorkspaceSegment & { publication_result?: Record< string, unknown > } > {
+): Promise<
+	WorkspaceSegment & { publication_result?: Record< string, unknown > }
+> {
 	try {
 		return await apiFetch( {
 			path: path(
@@ -663,7 +729,9 @@ export async function unpublishSegment(
 	postId: number,
 	languageCode: string,
 	segmentKey: string
-): Promise< WorkspaceSegment & { publication_result?: Record< string, unknown > } > {
+): Promise<
+	WorkspaceSegment & { publication_result?: Record< string, unknown > }
+> {
 	try {
 		return await apiFetch( {
 			path: path(
@@ -685,9 +753,11 @@ export async function acceptTmSuggestions(
 	segmentKeys: string[]
 ): Promise< BatchSaveResult > {
 	try {
-		const response = await apiFetch< BatchSaveResult & {
-			segments: WorkspaceSegment[];
-		} >( {
+		const response = await apiFetch<
+			BatchSaveResult & {
+				segments: WorkspaceSegment[];
+			}
+		>( {
 			path: path(
 				`workspace/${ postId }/suggestions/accept?language=${ encodeURIComponent(
 					languageCode
@@ -737,10 +807,10 @@ export async function runQaBatch(
 /**
  * Submits (or resubmits, from `rejected`) one segment for review.
  *
- * @param postId                Post id.
- * @param languageCode          Target language code.
- * @param segmentKey            Segment key.
- * @param expectedReviewStatus  Optional optimistic `review_status` guard.
+ * @param postId               Post id.
+ * @param languageCode         Target language code.
+ * @param segmentKey           Segment key.
+ * @param expectedReviewStatus Optional optimistic `review_status` guard.
  */
 export async function submitReview(
 	postId: number,
@@ -753,7 +823,9 @@ export async function submitReview(
 			path: path(
 				`workspace/${ postId }/segments/${ encodeURIComponent(
 					segmentKey
-				) }/submit-review?language=${ encodeURIComponent( languageCode ) }`
+				) }/submit-review?language=${ encodeURIComponent(
+					languageCode
+				) }`
 			),
 			method: 'POST',
 			data: expectedReviewStatus
@@ -768,11 +840,11 @@ export async function submitReview(
 /**
  * Approves a pending review (QA freshness re-check happens server-side).
  *
- * @param postId                     Post id.
- * @param languageCode               Target language code.
- * @param segmentKey                 Segment key.
- * @param expectedReviewStatus       Optional optimistic `review_status` guard.
- * @param submittedTranslationHash   Optional client submitted-hash guard.
+ * @param postId                   Post id.
+ * @param languageCode             Target language code.
+ * @param segmentKey               Segment key.
+ * @param expectedReviewStatus     Optional optimistic `review_status` guard.
+ * @param submittedTranslationHash Optional client submitted-hash guard.
  */
 export async function approveReview(
 	postId: number,
@@ -806,12 +878,12 @@ export async function approveReview(
 /**
  * Rejects a pending review with a required reason (1–512 chars, trimmed).
  *
- * @param postId                     Post id.
- * @param languageCode               Target language code.
- * @param segmentKey                 Segment key.
- * @param reason                     Rejection reason.
- * @param expectedReviewStatus       Optional optimistic `review_status` guard.
- * @param submittedTranslationHash   Optional client submitted-hash guard.
+ * @param postId                   Post id.
+ * @param languageCode             Target language code.
+ * @param segmentKey               Segment key.
+ * @param reason                   Rejection reason.
+ * @param expectedReviewStatus     Optional optimistic `review_status` guard.
+ * @param submittedTranslationHash Optional client submitted-hash guard.
  */
 export async function rejectReview(
 	postId: number,
@@ -869,9 +941,11 @@ export async function batchReview(
 	reason = ''
 ): Promise< ReviewBatchResult > {
 	try {
-		const response = await apiFetch< ReviewBatchResult & {
-			segments: WorkspaceSegment[];
-		} >( {
+		const response = await apiFetch<
+			ReviewBatchResult & {
+				segments: WorkspaceSegment[];
+			}
+		>( {
 			path: path(
 				`workspace/${ postId }/segments/batch-review?language=${ encodeURIComponent(
 					languageCode
@@ -957,6 +1031,28 @@ export async function approveObject(
 				) }`
 			),
 			method: 'POST',
+		} );
+	} catch ( error ) {
+		throw new WorkspaceRequestError( userMessageFromError( error ) );
+	}
+}
+
+/**
+ * MLW1a (WP5/WP6) — "Approve all ready languages" for one object. Each ready
+ * language's full pending set is approved server-side in bounded chunks.
+ *
+ * @param postId        Canonical post id.
+ * @param languageCodes Ready language codes (from readyLanguageCodes()).
+ */
+export async function approveObjectLanguages(
+	postId: number,
+	languageCodes: string[]
+): Promise< ApproveObjectLanguagesResult > {
+	try {
+		return await apiFetch< ApproveObjectLanguagesResult >( {
+			path: path( `workspace/${ postId }/review/approve-object` ),
+			method: 'POST',
+			data: { languages: languageCodes },
 		} );
 	} catch ( error ) {
 		throw new WorkspaceRequestError( userMessageFromError( error ) );
@@ -1099,6 +1195,8 @@ export interface OperationsBulkResponse {
 
 /**
  * OTL.5 bounded Operations bulk (publish / unpublish / enqueue_retranslate).
+ * @param action
+ * @param items
  */
 export async function operationsBulk(
 	action: OperationsBulkAction,

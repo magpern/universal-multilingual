@@ -267,13 +267,14 @@ final class SiteTranslateController {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function create_jobs( WP_REST_Request $request ) {
-		$body        = $this->body_params( $request );
-		$post_ids    = array_map( 'intval', (array) ( $body['post_ids'] ?? array() ) );
-		$language_id = (int) ( $body['language_id'] ?? 0 );
+		$body     = $this->body_params( $request );
+		$post_ids = array_map( 'intval', (array) ( $body['post_ids'] ?? array() ) );
 
-		$language = $this->validate_language_id( $language_id );
-		if ( is_wp_error( $language ) ) {
-			return $language;
+		// MLW1a (ADR-0034 D7): accept language_ids[] for the N×M matrix; keep
+		// the scalar language_id working as one-element input.
+		$language_ids = $this->resolve_language_ids( $body );
+		if ( is_wp_error( $language_ids ) ) {
+			return $language_ids;
 		}
 
 		$scope = $this->assert_edit_posts( $post_ids );
@@ -281,10 +282,32 @@ final class SiteTranslateController {
 			return $scope;
 		}
 
+		// MLW1a (ADR-0034 D8): a selection touching an already-published
+		// language may become publicly visible under the existing policy —
+		// require explicit acknowledgement.
+		$published = $this->published_targets( $language_ids );
+		if ( array() !== $published && empty( $body['acknowledge_published'] ) ) {
+			return new WP_Error(
+				'aiml_acknowledge_published_required',
+				sprintf(
+					/* translators: %s: comma-separated language names. */
+					__(
+						'%s already published. New translations created for these languages may become visible to visitors immediately under the site\'s existing publication policy. Re-submit with acknowledgement to continue.',
+						'universal-multilingual'
+					),
+					implode( ', ', $published )
+				),
+				array(
+					'status'              => 400,
+					'published_languages' => $published,
+				)
+			);
+		}
+
 		$shared = $this->build_shared_create_args( $body );
-		$result = $this->batches->create_jobs(
+		$result = $this->batches->create_jobs_matrix(
 			$post_ids,
-			$language_id,
+			$language_ids,
 			$shared,
 			isset( $body['batch_id'] ) ? sanitize_text_field( (string) $body['batch_id'] ) : null
 		);
@@ -304,6 +327,8 @@ final class SiteTranslateController {
 		return $this->respond(
 			array(
 				'batch_id'        => $result['batch_id'],
+				'language_ids'    => $language_ids,
+				'operations'      => (int) $result['attempted_count'] + (int) $result['skipped_count'],
 				'autostarted'     => $autostarted,
 				'complete'        => (bool) $result['complete'],
 				'created_count'   => (int) $result['created_count'],
@@ -467,6 +492,67 @@ final class SiteTranslateController {
 		}
 
 		return $language_id;
+	}
+
+	/**
+	 * MLW1a — resolves language_ids[] (or a scalar language_id fallback) to a
+	 * validated, de-duplicated int list; rejects the source and disabled
+	 * languages.
+	 *
+	 * @param array<string, mixed> $body Request body.
+	 * @return array<int, int>|WP_Error
+	 */
+	private function resolve_language_ids( array $body ) {
+		$raw = array();
+		if ( isset( $body['language_ids'] ) && is_array( $body['language_ids'] ) ) {
+			$raw = $body['language_ids'];
+		} elseif ( isset( $body['language_id'] ) ) {
+			$raw = array( $body['language_id'] );
+		}
+
+		$ids = array();
+		foreach ( $raw as $value ) {
+			$id = (int) $value;
+			if ( $id <= 0 ) {
+				continue;
+			}
+			$language = $this->languages->find( $id );
+			if ( null === $language ) {
+				return new WP_Error( 'invalid_language', sprintf( /* translators: %d: language id. */ __( 'Unknown target language %d.', 'universal-multilingual' ), $id ), array( 'status' => 422 ) );
+			}
+			if ( ! empty( $language->is_default ) ) {
+				return new WP_Error( 'aiml_source_language', __( 'The source language cannot be a translation target.', 'universal-multilingual' ), array( 'status' => 422 ) );
+			}
+			if ( Languages::STATUS_DISABLED === (string) ( $language->status ?? '' ) ) {
+				return new WP_Error( 'aiml_disabled_language', __( 'A selected language is disabled.', 'universal-multilingual' ), array( 'status' => 422 ) );
+			}
+			$ids[ $id ] = $id;
+		}
+
+		if ( array() === $ids ) {
+			return new WP_Error( 'invalid_language', __( 'language_ids or language_id is required.', 'universal-multilingual' ), array( 'status' => 422 ) );
+		}
+
+		return array_values( $ids );
+	}
+
+	/**
+	 * MLW1a — names of the selected languages that are already published
+	 * (ADR-0034 D8).
+	 *
+	 * @param array<int, int> $language_ids Target language ids.
+	 * @return array<int, string>
+	 */
+	private function published_targets( array $language_ids ): array {
+		$names = array();
+		foreach ( $language_ids as $language_id ) {
+			$language = $this->languages->find( (int) $language_id );
+			if ( null !== $language && Languages::STATUS_PUBLISHED === (string) ( $language->status ?? '' ) ) {
+				$names[] = (string) ( $language->name ?? $language->code ?? $language_id );
+			}
+		}
+
+		return $names;
 	}
 
 	/**

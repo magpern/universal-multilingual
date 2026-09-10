@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace AIMultilingual\Rest;
 
+use AIMultilingual\Jobs\JobsCapabilities;
 use AIMultilingual\Plugin;
 use AIMultilingual\Rest\ViewModel\OperatorTranslationDetailSerializer;
 use AIMultilingual\Rest\ViewModel\OperatorTranslationListItemSerializer;
@@ -295,6 +296,33 @@ final class WorkspaceController {
 
 		register_rest_route(
 			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/(?P<post_id>\d+)/languages',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_object_languages' ),
+				'permission_callback' => array( $this, 'can_edit_post' ),
+				'args'                => array(
+					'post_id' => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/objects/translate',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'translate_objects' ),
+				'permission_callback' => array( $this, 'can_translate_objects' ),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
 			'/' . self::REST_BASE . '/(?P<post_id>\d+)/segments/batch',
 			array(
 				'methods'             => 'POST',
@@ -379,7 +407,7 @@ final class WorkspaceController {
 					),
 					'language' => array(
 						'type'     => 'string',
-						'required' => true,
+						'required' => false,
 					),
 				),
 			)
@@ -866,6 +894,117 @@ final class WorkspaceController {
 				$this->workspace->page_status( $post, (int) $language->language_id )
 			)->to_array()
 		);
+	}
+
+	/**
+	 * MLW1a — object × language completeness for one content object across
+	 * every eligible configured target language (ADR-0034 D2/D3). Every
+	 * canonical `state` is server-computed; the client renders it verbatim.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_object_languages( WP_REST_Request $request ) {
+		$post = $this->resolve_post( $request );
+		if ( $post instanceof WP_Error ) {
+			return $post;
+		}
+
+		$result = $this->workspace->object_languages_summary( $post );
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		return $this->respond( $result );
+	}
+
+	/**
+	 * MLW1a — creates one background translation job per (object × language)
+	 * for N objects × M languages (ADR-0034 D7). Authorization is done in
+	 * {@see can_translate_objects()} (correction C3): no cross-product is
+	 * built and no job is created until every requested object is authorized.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function translate_objects( WP_REST_Request $request ) {
+		$params = $this->body_params( $request );
+
+		if ( ! empty( $params['automatic'] ) ) {
+			return new WP_Error(
+				'aiml_automatic_unavailable',
+				__( 'Automatic AI translation mode ships in a later milestone (MLW1b).', 'universal-multilingual' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$object_ids   = array_map( 'absint', (array) ( $params['object_ids'] ?? array() ) );
+		$language_ids = array_map( 'absint', (array) ( $params['language_ids'] ?? array() ) );
+		$job_type     = sanitize_key( (string) ( $params['job_type'] ?? 'missing' ) );
+
+		$result = $this->workspace->translate_objects(
+			$object_ids,
+			$language_ids,
+			$job_type,
+			(int) get_current_user_id(),
+			$this->nullable_string( $params['client_token'] ?? null ),
+			! empty( $params['acknowledge_published'] )
+		);
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		return $this->respond( $result, 201 );
+	}
+
+	/**
+	 * Body-reading authorization for {@see translate_objects()} (correction C3).
+	 *
+	 * Allowed iff the user can MANAGE_JOBS, OR can `edit_post` EVERY id in
+	 * `object_ids[]`. Any failing object rejects the whole request (403) with
+	 * zero side effects — the handler never runs.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return bool|WP_Error
+	 */
+	public function can_translate_objects( WP_REST_Request $request ) {
+		$base = $this->can_translate();
+		if ( true !== $base ) {
+			return $base;
+		}
+
+		if ( current_user_can( JobsCapabilities::MANAGE_JOBS ) ) {
+			return true;
+		}
+
+		$params     = $this->body_params( $request );
+		$object_ids = array_values(
+			array_filter( array_map( 'absint', (array) ( $params['object_ids'] ?? array() ) ) )
+		);
+
+		if ( array() === $object_ids ) {
+			return new WP_Error(
+				'aiml_no_objects',
+				__( 'Select at least one object to translate.', 'universal-multilingual' ),
+				array( 'status' => 422 )
+			);
+		}
+
+		foreach ( $object_ids as $object_id ) {
+			if ( ! current_user_can( 'edit_post', $object_id ) ) {
+				return new WP_Error(
+					'aiml_forbidden',
+					sprintf(
+						/* translators: %d: post id. */
+						__( 'You do not have permission to translate object %d.', 'universal-multilingual' ),
+						$object_id
+					),
+					array( 'status' => 403 )
+				);
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -1570,6 +1709,10 @@ final class WorkspaceController {
 			$args['review_status'] = sanitize_key( (string) $review_status );
 		}
 
+		// MLW1a (ADR-0034 C1): optional multi-language filter for the
+		// object-first read model.
+		$language_ids = $this->resolve_language_ids( $request->get_param( 'languages' ) );
+
 		$result = $this->workspace->review_queue_grouped( $args );
 		if ( $result instanceof WP_Error ) {
 			return $result;
@@ -1581,15 +1724,61 @@ final class WorkspaceController {
 			$objects[]      = $group;
 		}
 
-		return $this->respond(
+		$grouped       = $this->workspace->review_queue_by_object(
 			array(
-				'items'    => $this->review_queue_serializer->many_to_arrays( $result['items'] ),
-				'objects'  => $objects,
-				'total'    => $result['total'],
-				'page'     => $result['page'],
-				'per_page' => $result['per_page'],
+				'language_ids'  => $language_ids,
+				'review_status' => $args['review_status'] ?? 'pending',
+				'page'          => $args['page'],
+				'per_page'      => $args['per_page'],
 			)
 		);
+		$object_groups = array();
+		foreach ( $grouped['objects'] as $object ) {
+			foreach ( $object['languages'] as $index => $language ) {
+				$object['languages'][ $index ]['items'] = $this->review_queue_serializer->many_to_arrays( $language['items'] );
+			}
+			$object_groups[] = $object;
+		}
+
+		return $this->respond(
+			array(
+				'items'         => $this->review_queue_serializer->many_to_arrays( $result['items'] ),
+				'objects'       => $objects,
+				'object_groups' => $object_groups,
+				'object_total'  => (int) $grouped['total'],
+				'total'         => $result['total'],
+				'page'          => $result['page'],
+				'per_page'      => $result['per_page'],
+			)
+		);
+	}
+
+	/**
+	 * Resolves a `languages` request param (array of codes and/or ids) to
+	 * language ids. Empty/absent yields an empty array (no filter).
+	 *
+	 * @param mixed $raw Raw request value.
+	 * @return array<int, int>
+	 */
+	private function resolve_language_ids( $raw ): array {
+		if ( null === $raw || '' === $raw ) {
+			return array();
+		}
+
+		$values = is_array( $raw ) ? $raw : preg_split( '/\s*,\s*/', (string) $raw, -1, PREG_SPLIT_NO_EMPTY );
+		$ids    = array();
+		foreach ( (array) $values as $value ) {
+			if ( is_numeric( $value ) ) {
+				$ids[ (int) $value ] = (int) $value;
+				continue;
+			}
+			$language = $this->workspace->resolve_language( sanitize_key( (string) $value ) );
+			if ( null !== $language ) {
+				$ids[ (int) $language->language_id ] = (int) $language->language_id;
+			}
+		}
+
+		return array_values( $ids );
 	}
 
 	/**
@@ -1602,6 +1791,20 @@ final class WorkspaceController {
 		$post = $this->resolve_post( $request );
 		if ( $post instanceof WP_Error ) {
 			return $post;
+		}
+
+		// MLW1a (ADR-0034 C4/D6): `languages[]` in the body switches to
+		// "Approve all ready languages" — bounded per-language approval that
+		// keeps the >50-pending-segment guarantee.
+		$languages = $this->body_params( $request )['languages'] ?? null;
+		if ( null !== $languages ) {
+			$result = $this->workspace->approve_object_languages(
+				$post,
+				$this->resolve_language_ids( $languages ),
+				(int) get_current_user_id()
+			);
+
+			return $result instanceof WP_Error ? $result : $this->respond( $result );
 		}
 
 		$language = $this->resolve_language_param( $request );
@@ -1851,10 +2054,11 @@ final class WorkspaceController {
 	 * Wraps a ViewModel payload in a versioned REST response.
 	 *
 	 * @param array<string, mixed> $payload Response payload.
+	 * @param int                  $status  HTTP status code (201 for creation).
 	 * @return WP_REST_Response
 	 */
-	private function respond( array $payload ): WP_REST_Response {
-		$response = new WP_REST_Response( $payload, 200 );
+	private function respond( array $payload, int $status = 200 ): WP_REST_Response {
+		$response = new WP_REST_Response( $payload, $status );
 		$response->header( 'X-AIML-Workspace-Api-Version', '1' );
 
 		return $response;

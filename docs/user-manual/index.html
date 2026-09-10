@@ -508,8 +508,14 @@ footer.doc-foot {
   <p>The action runs a background job, starts it immediately, and refreshes the editor when it finishes with a plain summary (<em>N translated · M kept · F failed</em>). You can close the browser while it runs. <strong>Manually edited, reviewed and in-review translations are never replaced by any mode</strong> — they are counted as “kept”. If AI translation is not configured, the button stays visible but disabled with a link to the settings screen (administrators only).</p>
   <p>The older <span class="menu-path">Multilingual → Translate</span> screen now links straight into this flow with the page and language preselected.</p>
 
-  <h3>Translate with AI (many pages)</h3>
-  <p><span class="menu-path">Workspace → Site Translate</span>, or select pages/posts in the WordPress list table and choose the <strong>Translate with AI</strong> bulk action. Pick a target language and a mode, then <strong>Translate selected with AI</strong> — the jobs are created and started in one step. Progress, failures and retry are on the Jobs view.</p>
+  <h3>Working with many languages at once (one page)</h3>
+  <p>On the Workspace editor, the <strong>Languages to work on</strong> checklist (all target languages checked by default) picks which languages the page is loaded for. After <strong>Load</strong>, a tab strip shows one tab per selected language with its state badge, and a <strong>“N / M languages ready”</strong> bar. <strong>M</strong> is every configured target language — a language you never selected still counts, so a forgotten language is always visible; <strong>N</strong> is the languages that are complete and clean (nothing missing or stale, no quality errors, and reviewed/translated). Clicking a tab switches the active language without reloading the page — <strong>Translate with AI</strong> and the review actions act on the active tab. A page-actions menu adds <em>Translate all selected languages with AI</em> and <em>Approve all ready languages</em>.</p>
+
+  <h3>Translate with AI (many pages × many languages)</h3>
+  <p><span class="menu-path">Workspace → Site Translate</span>, or select pages/posts in the WordPress list table and choose the <strong>Translate with AI</strong> bulk action. Tick the objects and the <strong>target languages</strong> (all checked by default), then <strong>Translate selected with AI</strong>. A pre-run line shows the count as <em>“5 pages × 3 languages = 15 translations”</em> — this is the number of page-and-language operations, not a token or cost estimate. The jobs are created and started in one step (one background batch); progress, failures and retry are on the Jobs view. Retrying a batch only creates the page-and-language pairs that are still missing.</p>
+
+  <h3 id="published-language-acknowledgement">Translating into an already-published language</h3>
+  <p>Universal Multilingual never changes a language's publication status and never publishes content for you. But a translation written into a language that is <strong>already published</strong> may become visible to visitors immediately under the site's existing rendering policy. So whenever a bulk or multi-language run targets one or more published languages, you must tick an acknowledgement (<em>“I understand and want to continue”</em>) before it will start — the server rejects the run otherwise. Preview-status languages render for signed-in editors only and need no acknowledgement.</p>
 
   <h3>Posts &amp; pages</h3>
   <p>Use Workspace Operations/Translate. Hierarchical pages share the Localized URL panel with posts once Localized URLs are On and shapes are admitted.</p>
@@ -629,6 +635,10 @@ footer.doc-foot {
     <li>Review queue uses review statuses such as not submitted / pending / approved / rejected (Workspace types).</li>
   </ul>
   <p>If a translation exists but is not publicly eligible, visitors continue to see source (or prior eligible overlay) according to surface rules — treat “exists in Workspace” ≠ “visible on front end” when the gate is On.</p>
+
+  <h3>Review queue — one card per page, all languages</h3>
+  <p>The Review queue is grouped by content object: one card per page/product showing every target language together, with a per-language tab strip and the same <strong>“N / M languages ready”</strong> bar as the Workspace. A language that is not translated, incomplete, needs attention, pending, ready or complete is always shown on the card, so a single-language view can never hide a forgotten language. The card paginates by <strong>object</strong> — one page's languages are never split across pages.</p>
+  <p><strong>Approve all ready languages</strong> approves every currently pending segment for every language on the card that is clean (nothing missing, stale, rejected, or quality-blocked), processing the whole pending set — not just the first batch — for each language. A language that needs attention is listed as skipped, never silently approved, and the result says plainly when the object is not fully reviewed. Per-field and per-language approval still work exactly as before.</p>
   <a class="back-top" href="#content">Back to top</a>
 </section>
 

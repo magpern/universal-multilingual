@@ -4,14 +4,17 @@ import { __, sprintf } from '@wordpress/i18n';
 
 import {
 	approveObject,
+	approveObjectLanguages,
 	approveReview,
 	batchReview,
 	fetchReviewQueue,
 	rejectReview,
 } from '../api/workspace-api';
 import type {
+	ApproveObjectLanguagesResult,
 	ApproveObjectResult,
 	LanguageOption,
+	ReviewObjectCard as ReviewObjectCardModel,
 	ReviewObjectGroup as ReviewObjectGroupModel,
 	ReviewQueueItem,
 } from '../types/view-models';
@@ -22,10 +25,12 @@ import {
 	isQueueItemSelectable,
 	languageCodeForId,
 	queueItemKey,
+	reviewObjectCards,
 	toggleQueueSelection,
 } from '../utils/review-queue';
 import type { ReviewQueueFilter } from '../utils/review-status';
 import ReviewDecisionDialog from './ReviewDecisionDialog';
+import ReviewObjectCard from './ReviewObjectCard';
 import ReviewObjectGroup from './ReviewObjectGroup';
 import ReviewQueueFilterBar from './ReviewQueueFilterBar';
 
@@ -66,7 +71,11 @@ export default function ReviewQueuePanel( {
 	const [ postIdFilter, setPostIdFilter ] = useState( initialPostId );
 	const [ page, setPage ] = useState( 1 );
 	const [ groups, setGroups ] = useState< ReviewObjectGroupModel[] >( [] );
+	const [ cards, setCards ] = useState< ReviewObjectCardModel[] >( [] );
+	const [ languagesResult, setLanguagesResult ] =
+		useState< ApproveObjectLanguagesResult | null >( null );
 	const [ total, setTotal ] = useState( 0 );
+	const [ objectTotal, setObjectTotal ] = useState( 0 );
 	const [ loading, setLoading ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ message, setMessage ] = useState( '' );
@@ -95,17 +104,23 @@ export default function ReviewQueuePanel( {
 				perPage: PER_PAGE,
 			} );
 			setGroups( groupQueueByObject( response ) );
+			setCards( reviewObjectCards( response ) );
 			setTotal( response.total );
+			setObjectTotal( response.object_total ?? 0 );
 		} catch {
 			setError(
 				__( 'Could not load the review queue.', 'ai-multilingual' )
 			);
 			setGroups( [] );
+			setCards( [] );
 			setTotal( 0 );
+			setObjectTotal( 0 );
 		} finally {
 			setLoading( false );
 		}
 	}, [ postIdFilter, languageCode, reviewStatus, page ] );
+
+	const useObjectCards = cards.length > 0;
 
 	useEffect( () => {
 		load();
@@ -116,7 +131,10 @@ export default function ReviewQueuePanel( {
 		setSelectedKeys( clearQueueSelection() );
 	}, [ reviewStatus, languageCode, postIdFilter ] );
 
-	const totalPages = Math.max( 1, Math.ceil( total / PER_PAGE ) );
+	const totalPages = Math.max(
+		1,
+		Math.ceil( ( useObjectCards ? objectTotal : total ) / PER_PAGE )
+	);
 
 	const groupLanguageCode = ( group: ReviewObjectGroupModel ): string =>
 		group.language_code ||
@@ -217,6 +235,39 @@ export default function ReviewQueuePanel( {
 		}
 	};
 
+	const handleApproveReadyLanguages = async (
+		card: ReviewObjectCardModel,
+		languageCodes: string[]
+	) => {
+		if ( 0 === languageCodes.length ) {
+			return;
+		}
+		setBusy( true );
+		setMessage( '' );
+		setObjectResult( null );
+		setLanguagesResult( null );
+		try {
+			const result = await approveObjectLanguages(
+				card.post_id,
+				languageCodes
+			);
+			setLanguagesResult( result );
+			setSelectedKeys( clearQueueSelection() );
+			load();
+		} catch ( unknownError ) {
+			setError(
+				unknownError instanceof Error
+					? unknownError.message
+					: __(
+							'Could not approve the ready languages.',
+							'ai-multilingual'
+					  )
+			);
+		} finally {
+			setBusy( false );
+		}
+	};
+
 	const handleApproveObject = async ( group: ReviewObjectGroupModel ) => {
 		const code = groupLanguageCode( group );
 		if ( ! code ) {
@@ -309,17 +360,88 @@ export default function ReviewQueuePanel( {
 				</Notice>
 			) }
 
-			{ ! loading && ! error && 0 === groups.length && (
-				<Notice status="info" isDismissible={ false }>
-					{ __(
-						'No translations match the current review queue filters.',
-						'ai-multilingual'
+			{ languagesResult && (
+				<Notice
+					status={
+						languagesResult.not_fully_reviewed
+							? 'warning'
+							: 'success'
+					}
+					isDismissible={ true }
+					onRemove={ () => setLanguagesResult( null ) }
+				>
+					<strong>{ languagesResult.post_title }</strong>:{ ' ' }
+					{ sprintf(
+						/* translators: 1: approved language count, 2: skipped language count */
+						__(
+							'%1$d language(s) approved · %2$d skipped',
+							'ai-multilingual'
+						),
+						languagesResult.approved_languages.length,
+						languagesResult.skipped_languages.length
+					) }
+					{ languagesResult.not_fully_reviewed &&
+						` — ${ __(
+							'object not fully reviewed',
+							'ai-multilingual'
+						) }` }
+					{ languagesResult.skipped_languages.length > 0 && (
+						<ul className="aiml-review-object-group__skipped">
+							{ languagesResult.skipped_languages.map(
+								( skip ) => (
+									<li key={ skip.language_code }>
+										{ `${ skip.language_code } — ${ skip.state }` }
+									</li>
+								)
+							) }
+						</ul>
 					) }
 				</Notice>
 			) }
 
 			{ ! loading &&
 				! error &&
+				0 === groups.length &&
+				0 === cards.length && (
+					<Notice status="info" isDismissible={ false }>
+						{ __(
+							'No translations match the current review queue filters.',
+							'ai-multilingual'
+						) }
+					</Notice>
+				) }
+
+			{ ! loading &&
+				! error &&
+				useObjectCards &&
+				cards.map( ( card ) => (
+					<ReviewObjectCard
+						key={ card.post_id }
+						card={ card }
+						languages={ languages }
+						canTranslate={ canTranslate }
+						busy={ busy || null !== dialog }
+						selectedKeys={ selectedKeys }
+						onToggleSelect={ ( key, checked ) =>
+							setSelectedKeys( ( current ) =>
+								toggleQueueSelection( current, key, checked )
+							)
+						}
+						onApproveRow={ ( item, code ) =>
+							openDialog( [ item ], 'approve', code )
+						}
+						onRejectRow={ ( item, code ) =>
+							openDialog( [ item ], 'reject', code )
+						}
+						onApproveReadyLanguages={ handleApproveReadyLanguages }
+						onOpenInEditor={ onOpenInEditor }
+						onOpenInOperations={ onOpenInOperations }
+					/>
+				) ) }
+
+			{ ! loading &&
+				! error &&
+				! useObjectCards &&
 				groups.map( ( group ) => (
 					<ReviewObjectGroup
 						key={ `${ group.post_id }:${ group.language_id }` }

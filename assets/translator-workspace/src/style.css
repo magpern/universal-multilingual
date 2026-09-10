@@ -867,3 +867,164 @@
 		display: none;
 	}
 }
+
+/* MLW1a — multi-language selection, tabs and the object-languages bar (WP2). */
+
+.aiml-translator-workspace .aiml-language-checklist {
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 0.75rem 1rem;
+	margin: 0 0 1rem;
+}
+
+.aiml-translator-workspace .aiml-language-checklist__legend {
+	font-weight: 600;
+	padding: 0 0.25rem;
+}
+
+.aiml-translator-workspace .aiml-language-checklist__all {
+	padding-bottom: 0.5rem;
+	margin-bottom: 0.5rem;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.aiml-translator-workspace .aiml-language-checklist__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+	gap: 0.25rem 1rem;
+}
+
+.aiml-translator-workspace .aiml-language-checklist__count {
+	margin: 0.5rem 0 0;
+	color: #646970;
+	font-size: 0.85em;
+}
+
+.aiml-translator-workspace .aiml-language-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+	border-bottom: 1px solid #dcdcde;
+	padding-bottom: 0.5rem;
+	margin-bottom: 1rem;
+}
+
+.aiml-translator-workspace .aiml-language-tabs__tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 999px;
+	padding: 0.25rem 0.75rem;
+	cursor: pointer;
+	font: inherit;
+	line-height: 1.6;
+}
+
+.aiml-translator-workspace .aiml-language-tabs__tab.is-active {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+
+.aiml-translator-workspace .aiml-language-tabs__tab:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.aiml-translator-workspace .aiml-language-tabs__name {
+	font-weight: 600;
+}
+
+.aiml-translator-workspace .aiml-object-languages-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.25rem 0.75rem;
+	margin: 0 0 1rem;
+	padding: 0.5rem 0.75rem;
+	background: #f6f7f7;
+	border-radius: 4px;
+}
+
+.aiml-translator-workspace .aiml-object-languages-bar.has-forgotten {
+	background: #fcf0e6;
+}
+
+.aiml-translator-workspace .aiml-object-languages-bar__breakdown {
+	color: #646970;
+}
+
+.aiml-translator-workspace .aiml-object-languages-bar__forgotten {
+	color: #a5540a;
+	font-weight: 600;
+	flex-basis: 100%;
+}
+
+/* MLW1a — object-first Review Queue card (WP6). */
+
+.aiml-translator-workspace .aiml-review-object-card {
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 1rem 1.25rem;
+	margin: 0 0 1rem;
+	background: #fff;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__header {
+	margin-bottom: 0.5rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__title {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__meta {
+	margin: 0.15rem 0 0;
+	color: #646970;
+	font-size: 0.85em;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.5rem 0 0.75rem;
+}
+
+.aiml-translator-workspace .aiml-review-object-card__language-state {
+	font-weight: 600;
+	margin: 0.5rem 0;
+}
+
+/* MLW1a — Site Translate N×M pre-run strip (WP7). */
+
+.aiml-translator-workspace .aiml-site-translate-prerun {
+	margin: 0.75rem 0;
+}
+
+.aiml-translator-workspace .aiml-site-translate-prerun__count {
+	font-weight: 600;
+	margin: 0 0 0.5rem;
+}
+
+/* MLW1a — "Translate all selected languages with AI" action (WP3/WP4). */
+
+.aiml-translator-workspace .aiml-workspace-translate-all {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin: 0.5rem 0 0.25rem;
+}
+
+.aiml-translator-workspace .aiml-workspace-translate-all__hint {
+	color: #646970;
+	font-size: 0.85em;
+}

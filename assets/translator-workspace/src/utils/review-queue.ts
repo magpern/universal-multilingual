@@ -1,5 +1,6 @@
 import type {
 	LanguageOption,
+	ReviewObjectCard,
 	ReviewObjectGroup,
 	ReviewQueueItem,
 	ReviewQueueResponse,
@@ -8,6 +9,7 @@ import type {
 /**
  * The review queue can span multiple posts and languages, so a segment key
  * alone is not a unique row identity — unlike the single-post segment table.
+ * @param item
  */
 export function queueItemKey( item: ReviewQueueItem ): string {
 	return `${ item.post_id }:${ item.language_id }:${ item.segment_key }`;
@@ -16,6 +18,7 @@ export function queueItemKey( item: ReviewQueueItem ): string {
 /**
  * Only `pending` rows have a legal approve/reject transition; other rows
  * stay visible (for context / filtering) but are excluded from selection.
+ * @param item
  */
 export function isQueueItemSelectable( item: ReviewQueueItem ): boolean {
 	return 'pending' === item.review_status;
@@ -98,6 +101,7 @@ export interface QueueBatchGroup {
  * a global filtered view. Group the current selection so the caller can
  * issue one REST call per (post, language) pair and merge the per-item
  * results back together.
+ * @param items
  */
 export function groupSelectedByPostLanguage(
 	items: ReviewQueueItem[]
@@ -177,6 +181,36 @@ export function languageCodeForId(
 	languages: LanguageOption[],
 	languageId: number
 ): string {
-	return languages.find( ( language ) => language.language_id === languageId )
-		?.code ?? '';
+	return (
+		languages.find( ( language ) => language.language_id === languageId )
+			?.code ?? ''
+	);
+}
+
+/**
+ * MLW1a (WP6) — the server's object-first Review Queue cards, or an empty
+ * list when the payload predates the object model. The client renders these
+ * verbatim and never re-derives per-language state.
+ *
+ * @param response Review queue REST response.
+ */
+export function reviewObjectCards(
+	response: ReviewQueueResponse
+): ReviewObjectCard[] {
+	return Array.isArray( response.object_groups )
+		? response.object_groups
+		: [];
+}
+
+/**
+ * Language codes in a card that are safe to approve now — the server marked
+ * each `summary.is_approvable` (pending rows, nothing missing/stale/rejected,
+ * no QA errors). This is a filter over a server decision, not a new decision.
+ *
+ * @param card One Review Queue object card.
+ */
+export function readyLanguageCodes( card: ReviewObjectCard ): string[] {
+	return card.languages
+		.filter( ( group ) => group.summary.is_approvable )
+		.map( ( group ) => group.language_code );
 }

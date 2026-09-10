@@ -189,11 +189,12 @@ final class SiteTranslateRestTest extends AimlTestCase {
 		$request = new WP_REST_Request( 'POST', '/aiml/v1/site-translate/jobs' );
 		$request->set_body_params(
 			array(
-				'post_ids'       => $post_ids,
-				'language_id'    => (int) $language->language_id,
-				'client_token'   => 'site-translate-test-token',
-				'prompt_profile' => 'default',
-				'prompt_version' => '1',
+				'post_ids'              => $post_ids,
+				'language_id'           => (int) $language->language_id,
+				'acknowledge_published' => true,
+				'client_token'          => 'site-translate-test-token',
+				'prompt_profile'        => 'default',
+				'prompt_version'        => '1',
 			)
 		);
 

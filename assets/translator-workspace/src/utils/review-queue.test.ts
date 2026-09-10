@@ -7,13 +7,17 @@ import {
 	isQueueItemSelectable,
 	languageCodeForId,
 	queueItemKey,
+	readyLanguageCodes,
+	reviewObjectCards,
 	selectAllQueueVisible,
 	selectableQueueItems,
 	selectedQueueItems,
 	toggleQueueSelection,
 } from './review-queue';
 
-function queueItem( overrides: Partial< ReviewQueueItem > = {} ): ReviewQueueItem {
+function queueItem(
+	overrides: Partial< ReviewQueueItem > = {}
+): ReviewQueueItem {
 	return {
 		source_type: 'post',
 		post_id: 10,
@@ -38,8 +42,20 @@ function queueItem( overrides: Partial< ReviewQueueItem > = {} ): ReviewQueueIte
 }
 
 const LANGUAGES: LanguageOption[] = [
-	{ language_id: 2, code: 'sv', name: 'Swedish', native_name: 'Svenska', status: 'active' },
-	{ language_id: 3, code: 'no', name: 'Norwegian', native_name: 'Norsk', status: 'active' },
+	{
+		language_id: 2,
+		code: 'sv',
+		name: 'Swedish',
+		native_name: 'Svenska',
+		status: 'active',
+	},
+	{
+		language_id: 3,
+		code: 'no',
+		name: 'Norwegian',
+		native_name: 'Norsk',
+		status: 'active',
+	},
 ];
 
 describe( 'review-queue', () => {
@@ -52,10 +68,12 @@ describe( 'review-queue', () => {
 		expect(
 			isQueueItemSelectable( queueItem( { review_status: 'approved' } ) )
 		).toBe( false );
-		expect( selectableQueueItems( [
-			queueItem( { segment_key: 'a' } ),
-			queueItem( { segment_key: 'b', review_status: 'rejected' } ),
-		] ) ).toHaveLength( 1 );
+		expect(
+			selectableQueueItems( [
+				queueItem( { segment_key: 'a' } ),
+				queueItem( { segment_key: 'b', review_status: 'rejected' } ),
+			] )
+		).toHaveLength( 1 );
 	} );
 
 	it( 'toggles selection membership', () => {
@@ -88,12 +106,20 @@ describe( 'review-queue', () => {
 	it( 'detects when all visible selectable rows are selected', () => {
 		const visible = [ queueItem( { segment_key: 'one' } ) ];
 		expect(
-			allQueueVisibleSelected( visible, new Set( [ queueItemKey( visible[ 0 ] ) ] ) )
+			allQueueVisibleSelected(
+				visible,
+				new Set( [ queueItemKey( visible[ 0 ] ) ] )
+			)
 		).toBe( true );
 		expect( allQueueVisibleSelected( visible, new Set() ) ).toBe( false );
 		expect(
 			allQueueVisibleSelected(
-				[ queueItem( { segment_key: 'x', review_status: 'approved' } ) ],
+				[
+					queueItem( {
+						segment_key: 'x',
+						review_status: 'approved',
+					} ),
+				],
 				new Set()
 			)
 		).toBe( false );
@@ -105,7 +131,9 @@ describe( 'review-queue', () => {
 			queueItem( { segment_key: 'two' } ),
 		];
 		const selected = new Set( [ queueItemKey( items[ 0 ] ) ] );
-		expect( selectedQueueItems( items, selected ) ).toEqual( [ items[ 0 ] ] );
+		expect( selectedQueueItems( items, selected ) ).toEqual( [
+			items[ 0 ],
+		] );
 	} );
 
 	it( 'groups a cross-post, cross-language selection for batched REST calls', () => {
@@ -183,5 +211,80 @@ describe( 'review-queue', () => {
 		} );
 		expect( groups ).toHaveLength( 2 );
 		expect( groups[ 0 ].items ).toHaveLength( 2 );
+	} );
+} );
+
+describe( 'MLW1a object-first cards', () => {
+	const languageGroup = ( code: string, approvable: boolean ) => ( {
+		language_id: code === 'sv' ? 2 : 3,
+		language_code: code,
+		language_name: code.toUpperCase(),
+		summary: {
+			language_id: code === 'sv' ? 2 : 3,
+			language_code: code,
+			language_name: code.toUpperCase(),
+			language_status: 'preview',
+			total: 5,
+			translated: 5,
+			missing: 0,
+			stale: 0,
+			pending: approvable ? 3 : 0,
+			approved: 0,
+			rejected: 0,
+			published_segments: 0,
+			has_active_job: false,
+			has_qa_errors: false,
+			state: approvable
+				? ( 'pending_review' as const )
+				: ( 'reviewed' as const ),
+			is_ready: true,
+			is_forgotten: false,
+			is_approvable: approvable,
+		},
+		items: [],
+	} );
+
+	const card = {
+		post_id: 3602,
+		post_title: 'Hexarelin',
+		post_type: 'product',
+		object_noun: 'Product',
+		post_status: 'publish',
+		edit_link: '',
+		languages: [
+			languageGroup( 'sv', true ),
+			languageGroup( 'de', false ),
+		],
+		object_languages_summary: {
+			target_count: 3,
+			ready_count: 2,
+			not_translated_count: 1,
+			incomplete_count: 0,
+			translating_count: 0,
+			approvable_count: 1,
+			forgotten: true,
+			forgotten_languages: [ 'da' ],
+		},
+	};
+
+	it( 'returns object_groups verbatim, or [] for a legacy payload', () => {
+		expect(
+			reviewObjectCards( {
+				items: [],
+				object_groups: [ card ],
+				object_total: 1,
+				total: 3,
+				page: 1,
+				per_page: 100,
+			} )
+		).toEqual( [ card ] );
+
+		expect(
+			reviewObjectCards( { items: [], total: 0, page: 1, per_page: 100 } )
+		).toEqual( [] );
+	} );
+
+	it( 'readyLanguageCodes filters on the server is_approvable flag only', () => {
+		expect( readyLanguageCodes( card ) ).toEqual( [ 'sv' ] );
 	} );
 } );

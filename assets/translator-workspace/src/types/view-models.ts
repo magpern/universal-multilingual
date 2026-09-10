@@ -17,7 +17,11 @@ export interface WorkspacePageSummary {
 	stale_count: number;
 }
 
-export type ReviewStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected';
+export type ReviewStatus =
+	| 'not_submitted'
+	| 'pending'
+	| 'approved'
+	| 'rejected';
 
 export interface ReviewMetadata {
 	review_status: ReviewStatus | string;
@@ -84,6 +88,64 @@ export interface ObjectReviewSummary {
 	is_fully_reviewed: boolean;
 }
 
+/**
+ * MLW1a — canonical "object × language" state. Server-authoritative
+ * (ADR-0034 D2): the client renders `state` verbatim and never re-derives it.
+ */
+export type ObjectLanguageState =
+	| 'translating'
+	| 'not_translated'
+	| 'missing_fields'
+	| 'needs_attention'
+	| 'pending_review'
+	| 'reviewed'
+	| 'preview'
+	| 'published'
+	| 'translated';
+
+export interface ObjectLanguageStatus {
+	language_id: number;
+	language_code: string;
+	language_name: string;
+	language_status: string;
+	total: number;
+	translated: number;
+	missing: number;
+	stale: number;
+	pending: number;
+	approved: number;
+	rejected: number;
+	published_segments: number;
+	has_active_job: boolean;
+	has_qa_errors: boolean;
+	state: ObjectLanguageState;
+	is_ready: boolean;
+	is_forgotten: boolean;
+	is_approvable: boolean;
+}
+
+export interface ObjectLanguagesSummary {
+	target_count: number;
+	ready_count: number;
+	not_translated_count: number;
+	incomplete_count: number;
+	translating_count: number;
+	approvable_count: number;
+	forgotten: boolean;
+	forgotten_languages: string[];
+}
+
+export interface ObjectLanguagesResponse {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	post_status: string;
+	object_noun: string;
+	edit_link: string;
+	languages: ObjectLanguageStatus[];
+	summary: ObjectLanguagesSummary;
+}
+
 export interface ReviewObjectGroup {
 	post_id: number;
 	post_title: string;
@@ -98,12 +160,82 @@ export interface ReviewObjectGroup {
 	items: ReviewQueueItem[];
 }
 
+/**
+ * MLW1a (WP5/WP6) — one target language inside a Review Queue object card.
+ * `summary` is the server-authoritative ObjectLanguageStatus (state decided
+ * in PHP; the client renders it verbatim).
+ */
+export interface ReviewObjectLanguageGroup {
+	language_id: number;
+	language_code: string;
+	language_name: string;
+	summary: ObjectLanguageStatus;
+	items: ReviewQueueItem[];
+}
+
+/** MLW1a (WP5/WP6) — one Review Queue card = one content object, all languages. */
+export interface ReviewObjectCard {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	object_noun: string;
+	post_status: string;
+	edit_link: string;
+	languages: ReviewObjectLanguageGroup[];
+	object_languages_summary: ObjectLanguagesSummary;
+}
+
+export interface TranslateObjectsResult {
+	batch_id: string;
+	planned: {
+		objects: number;
+		languages: number;
+		operations: number;
+		chunks: number;
+	};
+	created: number;
+	failed: unknown[];
+	autostarted: boolean;
+}
+
 export interface ReviewQueueResponse {
 	items: ReviewQueueItem[];
 	objects?: ReviewObjectGroup[];
+	/** MLW1a object-first read model (ADR-0034 C1). */
+	object_groups?: ReviewObjectCard[];
+	/** Distinct-object count for object-level pagination. */
+	object_total?: number;
 	total: number;
 	page: number;
 	per_page: number;
+}
+
+export interface ApproveObjectLanguageResult {
+	language_id: number;
+	language_code: string;
+	approved_count: number;
+	skipped: Array< {
+		segment_key: string;
+		code: string;
+		message: string;
+		field_label?: string;
+	} >;
+	summary: ObjectReviewSummary;
+}
+
+export interface ApproveObjectLanguagesResult {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	approved_languages: ApproveObjectLanguageResult[];
+	skipped_languages: Array< {
+		language_id: number;
+		language_code: string;
+		state: string;
+		pending: number;
+	} >;
+	summary: ObjectLanguagesSummary;
+	not_fully_reviewed: boolean;
 }
 
 export interface ApproveObjectResult {
@@ -142,14 +274,14 @@ export interface NormalizedSuggestion {
 	target_text: string;
 	confidence: number;
 	rank_tier: number;
-	metadata: Record<string, unknown>;
+	metadata: Record< string, unknown >;
 }
 
 export interface QAIssue {
 	code: string;
 	severity: 'error' | 'warning' | 'info' | string;
 	message: string;
-	details: Record<string, unknown>;
+	details: Record< string, unknown >;
 }
 
 export interface QASummary {
@@ -166,7 +298,7 @@ export interface SegmentQA {
 export interface WorkspaceSegmentMeta {
 	suggestions?: NormalizedSuggestion[];
 	qa?: SegmentQA;
-	[key: string]: unknown;
+	[ key: string ]: unknown;
 }
 
 export interface WorkspaceSegmentsResponse {

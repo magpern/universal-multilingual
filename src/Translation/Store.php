@@ -1039,6 +1039,187 @@ final class Store {
 	}
 
 	/**
+	 * MLW1a (ADR-0034 C1) — object-level Review Queue pagination.
+	 *
+	 * Paginates distinct content objects that have review rows, via a grouped
+	 * query, so one object's languages are NEVER split across pages:
+	 *
+	 *   SELECT source_id FROM {translations}
+	 *    WHERE source_type = %s AND review_status = %s [AND language_id IN (…)]
+	 *    GROUP BY source_id
+	 *    ORDER BY MIN(review_submitted_at) ASC, source_id ASC
+	 *    LIMIT %d OFFSET %d
+	 *
+	 * `total` is COUNT(DISTINCT source_id) — an object count, never a segment
+	 * count. `source_id ASC` is the deterministic tie-break when the earliest
+	 * submission times are equal.
+	 *
+	 * @param array<string, mixed> $args Query args: source_type, review_status
+	 *                                   ('all' or a review_statuses() value),
+	 *                                   language_ids (int[]), page, per_page.
+	 * @return array{object_ids: array<int,int>, total: int, page: int, per_page: int}
+	 */
+	public function query_review_object_ids( array $args = array() ): array {
+		global $wpdb;
+
+		$source_type   = (string) ( $args['source_type'] ?? self::SOURCE_POST );
+		$review_status = (string) ( $args['review_status'] ?? self::REVIEW_PENDING );
+		$language_ids  = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'intval', (array) ( $args['language_ids'] ?? array() ) ),
+					static fn( int $id ): bool => $id > 0
+				)
+			)
+		);
+		$page          = max( 1, (int) ( $args['page'] ?? 1 ) );
+		$per_page      = max( 1, min( self::REVIEW_QUEUE_MAX_PER_PAGE, (int) ( $args['per_page'] ?? 20 ) ) );
+
+		$empty = array(
+			'object_ids' => array(),
+			'total'      => 0,
+			'page'       => $page,
+			'per_page'   => $per_page,
+		);
+
+		if ( 'all' !== $review_status && ! in_array( $review_status, self::review_statuses(), true ) ) {
+			return $empty;
+		}
+
+		if ( ! $this->translations_table_exists() ) {
+			return $empty;
+		}
+
+		$where  = array( 'source_type = %s' );
+		$params = array( $source_type );
+
+		if ( 'all' !== $review_status ) {
+			$where[]  = 'review_status = %s';
+			$params[] = $review_status;
+		}
+
+		if ( array() !== $language_ids ) {
+			$where[] = 'language_id IN (' . implode( ',', array_fill( 0, count( $language_ids ), '%d' ) ) . ')';
+			$params  = array_merge( $params, $language_ids );
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		$total = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
+			$wpdb->prepare(
+				'SELECT COUNT(DISTINCT source_id) FROM ' . Schema::translations() . ' WHERE ' . $where_sql, // phpcs:ignore WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $where_sql is a fixed set of %s/%d placeholders matched 1:1 with $params.
+				$params
+			)
+		);
+
+		if ( $total <= 0 ) {
+			return $empty;
+		}
+
+		$offset      = ( $page - 1 ) * $per_page;
+		$list_params = array_merge( $params, array( $per_page, $offset ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $where_sql is a fixed set of %s/%d placeholders matched 1:1 with $list_params.
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				'SELECT source_id FROM ' . Schema::translations() . ' WHERE ' . $where_sql
+				. ' GROUP BY source_id ORDER BY MIN(review_submitted_at) ASC, source_id ASC LIMIT %d OFFSET %d',
+				$list_params
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return array(
+			'object_ids' => array_values(
+				array_map( static fn( object $row ): int => (int) $row->source_id, (array) $rows )
+			),
+			'total'      => $total,
+			'page'       => $page,
+			'per_page'   => $per_page,
+		);
+	}
+
+	/**
+	 * MLW1a (ADR-0034 C1) — every review row for the given objects across all
+	 * requested languages, hydrated, with NO row-level pagination.
+	 * Deterministic order: source_id, language_id, review_submitted_at,
+	 * translation_id.
+	 *
+	 * @param array<int,int> $source_ids    Object ids (from query_review_object_ids()).
+	 * @param array<int,int> $language_ids  Optional language filter (empty = all).
+	 * @param string         $review_status One of review_statuses() or 'all'.
+	 * @param string         $source_type   Source type. Default SOURCE_POST.
+	 * @return array<int, object>
+	 */
+	public function review_rows_for_objects(
+		array $source_ids,
+		array $language_ids = array(),
+		string $review_status = self::REVIEW_PENDING,
+		string $source_type = self::SOURCE_POST
+	): array {
+		global $wpdb;
+
+		$source_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'intval', $source_ids ),
+					static fn( int $id ): bool => $id > 0
+				)
+			)
+		);
+		if ( array() === $source_ids ) {
+			return array();
+		}
+
+		if ( 'all' !== $review_status && ! in_array( $review_status, self::review_statuses(), true ) ) {
+			return array();
+		}
+
+		if ( ! $this->translations_table_exists() ) {
+			return array();
+		}
+
+		$language_ids = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'intval', $language_ids ),
+					static fn( int $id ): bool => $id > 0
+				)
+			)
+		);
+
+		$where  = array( 'source_type = %s' );
+		$params = array( $source_type );
+
+		if ( 'all' !== $review_status ) {
+			$where[]  = 'review_status = %s';
+			$params[] = $review_status;
+		}
+
+		$where[] = 'source_id IN (' . implode( ',', array_fill( 0, count( $source_ids ), '%d' ) ) . ')';
+		$params  = array_merge( $params, $source_ids );
+
+		if ( array() !== $language_ids ) {
+			$where[] = 'language_id IN (' . implode( ',', array_fill( 0, count( $language_ids ), '%d' ) ) . ')';
+			$params  = array_merge( $params, $language_ids );
+		}
+
+		$where_sql = implode( ' AND ', $where );
+
+		// phpcs:disable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- $where_sql is a fixed set of %s/%d placeholders matched 1:1 with $params.
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				'SELECT * FROM ' . Schema::translations() . ' WHERE ' . $where_sql
+				. ' ORDER BY source_id ASC, language_id ASC, review_submitted_at ASC, translation_id ASC',
+				$params
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+
+		return array_map( array( $this, 'hydrate' ), (array) $rows );
+	}
+
+	/**
 	 * Upper bound (seconds) reported for pending-review age (ADR-0015 §13).
 	 *
 	 * Diagnostics are query-time and bounded on purpose: a very old,

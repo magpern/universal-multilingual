@@ -24,6 +24,9 @@ use AIMultilingual\Surface\SurfaceRegistry;
 use AIMultilingual\Translation\Store;
 use AIMultilingual\Translation\TermAdoptionService;
 use AIMultilingual\Jobs\BackgroundTranslationJobService;
+use AIMultilingual\Jobs\BackgroundTranslationJobRepository;
+use AIMultilingual\Jobs\JobLockKey;
+use AIMultilingual\SiteTranslate\SiteTranslateCoverageService;
 use AIMultilingual\Workspace\Operator\AllowedActionsResolver;
 use AIMultilingual\Workspace\Operator\OperationsBulkCoordinator;
 use AIMultilingual\Workspace\Operator\OperatorTranslationAssembler;
@@ -201,6 +204,20 @@ final class WorkspaceService {
 	private ?TermAdoptionService $term_adoption;
 
 	/**
+	 * MLW1a per-language publish coverage source (ADR-0034 D2).
+	 *
+	 * @var SiteTranslateCoverageService|null
+	 */
+	private ?SiteTranslateCoverageService $object_language_coverage = null;
+
+	/**
+	 * MLW1a active-job probe source (ADR-0034 D2).
+	 *
+	 * @var BackgroundTranslationJobRepository|null
+	 */
+	private ?BackgroundTranslationJobRepository $object_language_jobs = null;
+
+	/**
 	 * Builds the collaborator.
 	 *
 	 * @param SegmentAssembler               $assembler           Segment assembly.
@@ -299,6 +316,34 @@ final class WorkspaceService {
 	 */
 	public function set_jobs_service( BackgroundTranslationJobService $jobs ): void {
 		$this->operations_bulk->set_jobs( $jobs );
+	}
+
+	/**
+	 * Injects the read models the MLW1a object×language status model composes
+	 * (ADR-0034 D2). Both are plain readers; set after Plugin builds the
+	 * Site Translate + Jobs stacks.
+	 *
+	 * @param SiteTranslateCoverageService       $coverage       Per-language publish coverage.
+	 * @param BackgroundTranslationJobRepository $job_repository Active-job probe.
+	 */
+	public function set_object_language_sources(
+		SiteTranslateCoverageService $coverage,
+		BackgroundTranslationJobRepository $job_repository
+	): void {
+		$this->object_language_coverage = $coverage;
+		$this->object_language_jobs     = $job_repository;
+	}
+
+	/**
+	 * Job repository for the active-job probe, lazily created for unit/test
+	 * paths that construct WorkspaceService without Plugin wiring.
+	 */
+	private function object_language_job_repository(): BackgroundTranslationJobRepository {
+		if ( null === $this->object_language_jobs ) {
+			$this->object_language_jobs = new BackgroundTranslationJobRepository();
+		}
+
+		return $this->object_language_jobs;
 	}
 
 	/**
@@ -1547,6 +1592,130 @@ final class WorkspaceService {
 				$this->without_slug_segment( $this->assembler->assemble_for_post( $post, $language_id ) )
 			)
 		);
+	}
+
+	/**
+	 * MLW1a — object × language completeness for one content object across
+	 * every eligible configured target language (ADR-0034 D2/D3).
+	 *
+	 * `languages[]` always covers M — the full eligible target set — never the
+	 * operator-selected subset, so a language the operator never chose still
+	 * counts against `target_count` and cannot be forgotten. Every canonical
+	 * `state` is decided server-side; the client renders it verbatim.
+	 *
+	 * @param WP_Post $post Canonical post.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function object_languages_summary( WP_Post $post ) {
+		$this->assert_supported_post( $post );
+
+		$resolver  = new FieldLabelResolver();
+		$statuses  = array();
+		$languages = array();
+
+		foreach ( $this->eligible_target_languages() as $language ) {
+			$status      = $this->object_language_status( $post, $language );
+			$statuses[]  = $status;
+			$languages[] = $status->to_array();
+		}
+
+		$summary = ObjectLanguagesSummary::from_statuses( $statuses );
+
+		return array(
+			'post_id'     => (int) $post->ID,
+			'post_title'  => (string) $post->post_title,
+			'post_type'   => (string) $post->post_type,
+			'post_status' => (string) $post->post_status,
+			'object_noun' => $resolver->object_noun( (string) $post->post_type ),
+			'edit_link'   => (string) get_edit_post_link( (int) $post->ID, 'raw' ),
+			'languages'   => $languages,
+			'summary'     => $summary->to_array(),
+		);
+	}
+
+	/**
+	 * Composes one {@see ObjectLanguageStatus} for a post + language row.
+	 *
+	 * @param WP_Post $post     Canonical post.
+	 * @param object  $language Languages registry row.
+	 */
+	public function object_language_status( WP_Post $post, object $language ): ObjectLanguageStatus {
+		$language_id = (int) ( $language->language_id ?? 0 );
+
+		$coverage = null !== $this->object_language_coverage
+			? $this->object_language_coverage->coverage_for_post( $post, $language_id )
+			: array();
+
+		$lock_key       = JobLockKey::build( Store::SOURCE_POST, (int) $post->ID, $language_id );
+		$has_active_job = null !== $this->object_language_job_repository()->find_active_by_lock_key( $lock_key );
+
+		return ObjectLanguageStatus::compose(
+			$language,
+			$this->object_review_summary( $post, $language_id ),
+			$coverage,
+			$has_active_job,
+			$this->object_has_qa_errors( $post, $language_id )
+		);
+	}
+
+	/**
+	 * Eligible configured target languages (M): the registry minus the
+	 * default/source language and minus disabled languages — identical to
+	 * TranslatorWorkspace::language_bootstrap()'s filter.
+	 *
+	 * @return list<object>
+	 */
+	private function eligible_target_languages(): array {
+		$targets = array();
+		foreach ( $this->languages->all() as $language ) {
+			if ( ! empty( $language->is_default ) ) {
+				continue;
+			}
+
+			if ( Languages::STATUS_DISABLED === (string) ( $language->status ?? '' ) ) {
+				continue;
+			}
+
+			$targets[] = $language;
+		}
+
+		return $targets;
+	}
+
+	/**
+	 * Whether any translated segment for the object + language carries an
+	 * error-severity QA issue. Reuses the shared detector suite; empty targets
+	 * have no quality to assess and are skipped (mirrors attach_meta()).
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 */
+	private function object_has_qa_errors( WP_Post $post, int $language_id ): bool {
+		$default = $this->languages->default();
+		$context = array(
+			'source_language_id' => $default ? (int) $default->language_id : 0,
+			'target_language_id' => $language_id,
+		);
+
+		foreach ( $this->assembler->assemble_for_post( $post, $language_id ) as $segment ) {
+			$target = (string) ( $segment['translated_text'] ?? '' );
+			if ( '' === trim( $target ) ) {
+				continue;
+			}
+
+			$qa = $this->qa->evaluate(
+				(string) ( $segment['source_text'] ?? '' ),
+				$target,
+				(string) ( $segment['text_format'] ?? Store::FORMAT_PLAIN ),
+				$context
+			);
+
+			if ( $qa->has_errors() ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

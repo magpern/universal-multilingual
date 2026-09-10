@@ -17,7 +17,11 @@ export interface WorkspacePageSummary {
 	stale_count: number;
 }
 
-export type ReviewStatus = 'not_submitted' | 'pending' | 'approved' | 'rejected';
+export type ReviewStatus =
+	| 'not_submitted'
+	| 'pending'
+	| 'approved'
+	| 'rejected';
 
 export interface ReviewMetadata {
 	review_status: ReviewStatus | string;
@@ -84,6 +88,64 @@ export interface ObjectReviewSummary {
 	is_fully_reviewed: boolean;
 }
 
+/**
+ * MLW1a — canonical "object × language" state. Server-authoritative
+ * (ADR-0034 D2): the client renders `state` verbatim and never re-derives it.
+ */
+export type ObjectLanguageState =
+	| 'translating'
+	| 'not_translated'
+	| 'missing_fields'
+	| 'needs_attention'
+	| 'pending_review'
+	| 'reviewed'
+	| 'preview'
+	| 'published'
+	| 'translated';
+
+export interface ObjectLanguageStatus {
+	language_id: number;
+	language_code: string;
+	language_name: string;
+	language_status: string;
+	total: number;
+	translated: number;
+	missing: number;
+	stale: number;
+	pending: number;
+	approved: number;
+	rejected: number;
+	published_segments: number;
+	has_active_job: boolean;
+	has_qa_errors: boolean;
+	state: ObjectLanguageState;
+	is_ready: boolean;
+	is_forgotten: boolean;
+	is_approvable: boolean;
+}
+
+export interface ObjectLanguagesSummary {
+	target_count: number;
+	ready_count: number;
+	not_translated_count: number;
+	incomplete_count: number;
+	translating_count: number;
+	approvable_count: number;
+	forgotten: boolean;
+	forgotten_languages: string[];
+}
+
+export interface ObjectLanguagesResponse {
+	post_id: number;
+	post_title: string;
+	post_type: string;
+	post_status: string;
+	object_noun: string;
+	edit_link: string;
+	languages: ObjectLanguageStatus[];
+	summary: ObjectLanguagesSummary;
+}
+
 export interface ReviewObjectGroup {
 	post_id: number;
 	post_title: string;
@@ -142,14 +204,14 @@ export interface NormalizedSuggestion {
 	target_text: string;
 	confidence: number;
 	rank_tier: number;
-	metadata: Record<string, unknown>;
+	metadata: Record< string, unknown >;
 }
 
 export interface QAIssue {
 	code: string;
 	severity: 'error' | 'warning' | 'info' | string;
 	message: string;
-	details: Record<string, unknown>;
+	details: Record< string, unknown >;
 }
 
 export interface QASummary {
@@ -166,7 +228,7 @@ export interface SegmentQA {
 export interface WorkspaceSegmentMeta {
 	suggestions?: NormalizedSuggestion[];
 	qa?: SegmentQA;
-	[key: string]: unknown;
+	[ key: string ]: unknown;
 }
 
 export interface WorkspaceSegmentsResponse {

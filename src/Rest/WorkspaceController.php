@@ -295,6 +295,23 @@ final class WorkspaceController {
 
 		register_rest_route(
 			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/(?P<post_id>\d+)/languages',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_object_languages' ),
+				'permission_callback' => array( $this, 'can_edit_post' ),
+				'args'                => array(
+					'post_id' => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
 			'/' . self::REST_BASE . '/(?P<post_id>\d+)/segments/batch',
 			array(
 				'methods'             => 'POST',
@@ -866,6 +883,28 @@ final class WorkspaceController {
 				$this->workspace->page_status( $post, (int) $language->language_id )
 			)->to_array()
 		);
+	}
+
+	/**
+	 * MLW1a — object × language completeness for one content object across
+	 * every eligible configured target language (ADR-0034 D2/D3). Every
+	 * canonical `state` is server-computed; the client renders it verbatim.
+	 *
+	 * @param WP_REST_Request $request REST request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_object_languages( WP_REST_Request $request ) {
+		$post = $this->resolve_post( $request );
+		if ( $post instanceof WP_Error ) {
+			return $post;
+		}
+
+		$result = $this->workspace->object_languages_summary( $post );
+		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		return $this->respond( $result );
 	}
 
 	/**

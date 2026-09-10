@@ -102,19 +102,30 @@ final class ProviderRegistry {
 
 	/**
 	 * Resolves the active provider from settings, or the fallback.
+	 *
+	 * The `aiml_ai_provider` filter may return a different
+	 * `AIProviderInterface` — used by test / acceptance harnesses to inject a
+	 * deterministic provider without a real credential. It is never used by
+	 * the shipped plugin.
 	 */
 	public function active(): AIProviderInterface {
 		$data     = $this->settings->get();
 		$enabled  = ! empty( $data['ai_enabled'] );
 		$provider = (string) ( $data['ai_provider'] ?? '' );
 
-		if ( ! $enabled || '' === $provider ) {
-			return $this->fallback;
+		$resolved = $this->fallback;
+		if ( $enabled && '' !== $provider ) {
+			$candidate = $this->get( $provider );
+			if ( null !== $candidate && NullAIProvider::ID !== $candidate->get_id() ) {
+				$resolved = $candidate;
+			}
 		}
 
-		$resolved = $this->get( $provider );
-		if ( null === $resolved || NullAIProvider::ID === $resolved->get_id() ) {
-			return $this->fallback;
+		if ( function_exists( 'apply_filters' ) ) {
+			$filtered = apply_filters( 'aiml_ai_provider', $resolved, $this );
+			if ( $filtered instanceof AIProviderInterface ) {
+				return $filtered;
+			}
 		}
 
 		return $resolved;

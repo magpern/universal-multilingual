@@ -945,6 +945,12 @@ final class Plugin {
 			$meta_registry
 		);
 		$workspace->set_object_language_sources( $site_translate_coverage, $job_repo );
+		$workspace->set_multi_language_coordinator(
+			new \AIMultilingual\Workspace\MultiLanguageTranslationCoordinator(
+				$job_batches,
+				$languages
+			)
+		);
 		$site_translate_batches = new SiteTranslateBatchService(
 			$job_batches,
 			$job_repo,

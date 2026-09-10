@@ -218,6 +218,13 @@ final class WorkspaceService {
 	private ?BackgroundTranslationJobRepository $object_language_jobs = null;
 
 	/**
+	 * MLW1a N×M translation coordinator (ADR-0034 D7).
+	 *
+	 * @var MultiLanguageTranslationCoordinator|null
+	 */
+	private ?MultiLanguageTranslationCoordinator $multi_language_coordinator = null;
+
+	/**
 	 * Builds the collaborator.
 	 *
 	 * @param SegmentAssembler               $assembler           Segment assembly.
@@ -332,6 +339,74 @@ final class WorkspaceService {
 	): void {
 		$this->object_language_coverage = $coverage;
 		$this->object_language_jobs     = $job_repository;
+	}
+
+	/**
+	 * Injects the MLW1a N×M translation coordinator (ADR-0034 D7). Set from
+	 * Plugin after the Jobs stack is built.
+	 *
+	 * @param MultiLanguageTranslationCoordinator $coordinator Cross-product coordinator.
+	 */
+	public function set_multi_language_coordinator(
+		MultiLanguageTranslationCoordinator $coordinator
+	): void {
+		$this->multi_language_coordinator = $coordinator;
+	}
+
+	/**
+	 * MLW1a — creates one background translation job per (object × language)
+	 * for the given objects and target languages (ADR-0034 D7). Authorization
+	 * (edit_post on every object, or MANAGE_JOBS) is the REST
+	 * permission_callback's job and must have passed before this is called.
+	 *
+	 * @param array<int, int> $object_ids            Canonical post ids.
+	 * @param array<int, int> $language_ids          Target language ids.
+	 * @param string          $job_type              'missing' | 'stale' | 'machine'.
+	 * @param int             $user_id               Acting user id.
+	 * @param string|null     $client_token          Idempotency token.
+	 * @param bool            $acknowledge_published Operator acknowledged published-language visibility.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function translate_objects(
+		array $object_ids,
+		array $language_ids,
+		string $job_type,
+		int $user_id,
+		?string $client_token,
+		bool $acknowledge_published
+	) {
+		if ( null === $this->multi_language_coordinator ) {
+			return new WP_Error(
+				'aiml_jobs_unavailable',
+				__( 'Background translation is not available.', 'universal-multilingual' ),
+				array( 'status' => 503 )
+			);
+		}
+
+		foreach ( $object_ids as $object_id ) {
+			$post = get_post( (int) $object_id );
+			if ( ! $post instanceof WP_Post ) {
+				return new WP_Error(
+					'aiml_invalid_post',
+					sprintf(
+						/* translators: %d: post id. */
+						__( 'Object %d does not exist.', 'universal-multilingual' ),
+						(int) $object_id
+					),
+					array( 'status' => 422 )
+				);
+			}
+			$this->assert_supported_post( $post );
+		}
+
+		return $this->multi_language_coordinator->plan_and_create(
+			$object_ids,
+			$language_ids,
+			$job_type,
+			$user_id,
+			$client_token,
+			$acknowledge_published
+		);
 	}
 
 	/**

@@ -690,11 +690,21 @@ final class JobsController {
 				return new WP_Error( 'invalid_job_scope', 'Each bulk post requires source_id.', array( 'status' => 422 ) );
 			}
 
-			$scope_posts[] = array(
+			$post_scope = array(
 				'source_type'  => Store::SOURCE_POST,
 				'source_id'    => $source_id,
 				'segment_keys' => array_values( array_map( 'strval', (array) ( $post_args['segment_keys'] ?? array() ) ) ),
 			);
+
+			// MLW1a (ADR-0034 D7): honour a per-post language_id so the generic
+			// bulk API can also express an N objects × M languages request. The
+			// batch coordinator already reads it; the shared language_id stays
+			// the fallback.
+			if ( isset( $post_args['language_id'] ) && (int) $post_args['language_id'] > 0 ) {
+				$post_scope['language_id'] = (int) $post_args['language_id'];
+			}
+
+			$scope_posts[] = $post_scope;
 		}
 
 		$scope = $this->assert_edit_post_for_sources( $scope_posts );

@@ -1,8 +1,8 @@
 # AIT1 — AI Translation UX — Closure
 
-**Status:** **CLOSED — PASS WITH LIMITATIONS**
+**Status:** **CLOSED — PASS** (PO-accepted; released as v1.15.0)
 **Closed:** 2026-09-10
-**Version:** **1.14.0** (unchanged — v1.15.0 proposed for release) · **`Migrator::TARGET`:** **10** · **Migration:** **NONE**
+**Version:** **1.15.0** · **`Migrator::TARGET`:** **10** · **Migration:** **NONE**
 **Authoritative plan:** [`AIT1_AI_TRANSLATION_UX_IMPLEMENTATION_PLAN.md`](AIT1_AI_TRANSLATION_UX_IMPLEMENTATION_PLAN.md)
 **ADR:** [`../adr/0031-user-initiated-ai-translation.md`](../adr/0031-user-initiated-ai-translation.md)
 **Validation log:** [`AIT1_AI_TRANSLATION_UX_VALIDATION_LOG.md`](AIT1_AI_TRANSLATION_UX_VALIDATION_LOG.md)
@@ -13,7 +13,8 @@
 |---|---|
 | Baseline `origin/main` | `fad4f9da485d4fbfbd2a8e5434853f393698b516` (v1.14.0) |
 | Implementation branch | `feature/ait1-ai-translation-ux` |
-| Merge / tag / release | **NOT performed** — not authorized |
+| Merge | PR #67 → `main` `4e8836a50958f19c3a1b06c2e13e7620c1dffda9` |
+| Tag / release | `v1.15.0` — GitHub release + private update server via tag workflows |
 | DEV | branch deployed to `dev.biopentra.eu` for acceptance; still checked out there |
 
 ## What shipped
@@ -79,10 +80,10 @@ build zip + audit zip **PASS**.
 - `tsc --noEmit` still reports the two pre-existing errors (`OperationsPanel`,
   `SiteTranslatePanel` postType) — reproduced on the clean baseline; AIT1 adds
   none; not a CI gate.
-- WP11 release actions (version bump to v1.15.0, tag, GitHub release, bucket
-  publish) — deferred; not authorized.
-
 ## Next
 
-Host-side re-run of the four existing browser suites; `11b`; PO functional
-sign-off; then the v1.15.0 release.
+PO functional sign-off obtained; released as **v1.15.0** (version bump →
+`main`, annotated tag `v1.15.0`, tag-triggered GitHub release + private
+update-server publication). No PROD WordPress deployment performed or
+authorized. Host-side re-run of the four legacy browser suites and `11b` remain
+recommended as a separate DEV maintenance task.

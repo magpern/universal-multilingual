@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.14.0
+Stable tag: 1.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Multilingual layer for WordPress: canonical content with segment translations ap
 
 == Description ==
 
-Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
+Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.15.0 surfaces AI translation as one obvious action: a "Translate with AI" control on the Translator Workspace and a "Translate selected with AI" bulk action, both driven by the existing background Jobs pipeline, with manual, reviewed and in-review translations never overwritten. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
 
 == Installation ==
 
@@ -31,6 +31,19 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.15.0 =
+* "Translate with AI" on the Translator Workspace editor: one primary action translates a page's eligible segments, with a mode selector (Translate missing / Retranslate stale / Retranslate AI translations). It creates a background job, starts it immediately, polls status, refreshes the editor and reports N translated / M kept / F failed. Disabled (never hidden) with a "Configure AI settings" link when AI is not configured.
+* The legacy Translate screen is no longer an AI dead end: it deep-links into the Workspace AI flow with the post and target language preselected, plus an "Open in Translator Workspace" link.
+* Site Translate gains the same mode selector and a single "Translate selected with AI" action that creates and starts the batch; it pre-selects content passed from a new Pages/Posts list-table "Translate with AI" bulk action.
+* New retranslate_machine job type: replaces every eligible machine translation for an object regardless of stale state.
+* Manual, reviewed and in-review translations are never overwritten by a page or bulk AI action, in any mode. One shared policy (TranslatableSegmentEligibility) now also governs the synchronous workspace "Translate selected" path, closing a gap where it could overwrite a human's translation; protected segments are reported as skipped.
+* User-facing AI actions carry an automatic, invisible idempotency token: a double-click or a retry after a timeout collapses to one job, a deliberate re-run after completion is new work.
+* Shared internal navigation bar at the top of every Universal Multilingual admin screen (Languages, Settings, Limited Rollout, SEO Diagnostics, Translate, Workspace, Glossary, Translation Promotion). Each tab maps to the owning screen's existing capability, so a section the current user cannot open never appears. No JavaScript.
+* Shared aiml-ui admin design system extracted to assets/admin-ui/aiml-ui.css and applied to Languages, Settings, the Translator Workspace, Site Translate and Jobs. Job status reads in plain language; execution status and review status render as separate badges.
+* New Settings and Overview action links plus a Documentation meta link on the Plugins screen.
+* Elementor translation safety: _elementor_data, widget IDs and structure are never written; html/shortcode controls stay excluded (regression test added).
+* No database migration. Schema stays at version 10; settings shape stays at 3.
 
 = 1.14.0 =
 * DEV -> PROD translation promotion (ADR-0030): export reviewed translations as a versioned .json package, import on another environment with a strictly read-only dry-run, review new/updates/conflicts/stale/missing/route classifications, then explicitly apply. Idempotent and safe to re-run.

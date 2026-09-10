@@ -80,12 +80,12 @@ final class ElementorAiTranslationRoundtripTest extends AimlTestCase {
 			$glossary
 		);
 
-		$jobsRepo     = new BackgroundTranslationJobRepository();
+		$jobs_repo    = new BackgroundTranslationJobRepository();
 		$items        = new BackgroundTranslationItemRepository();
-		$leases       = new JobLeaseService( $jobsRepo, $items );
-		$recon        = new JobProgressReconciler( $jobsRepo, $items );
+		$leases       = new JobLeaseService( $jobs_repo, $items );
+		$recon        = new JobProgressReconciler( $jobs_repo, $items );
 		$this->jobs   = new BackgroundTranslationJobService(
-			$jobsRepo,
+			$jobs_repo,
 			$items,
 			$leases,
 			$recon,
@@ -98,7 +98,7 @@ final class ElementorAiTranslationRoundtripTest extends AimlTestCase {
 			$glossary,
 			$this->assembler
 		);
-		$this->worker = new BackgroundTranslationWorker( $processor, $this->jobs, $jobsRepo, $items, $leases, $recon );
+		$this->worker = new BackgroundTranslationWorker( $processor, $this->jobs, $jobs_repo, $items, $leases, $recon );
 	}
 
 	/**

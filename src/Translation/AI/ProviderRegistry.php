@@ -122,6 +122,18 @@ final class ProviderRegistry {
 		}
 
 		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters the active AI translation provider.
+			 *
+			 * Test / acceptance harnesses return a deterministic
+			 * AIProviderInterface here so the suite never calls a paid
+			 * provider. The shipped plugin registers no listener.
+			 *
+			 * @since 1.15.0
+			 *
+			 * @param AIProviderInterface $resolved The settings-resolved provider.
+			 * @param ProviderRegistry    $registry This registry.
+			 */
 			$filtered = apply_filters( 'aiml_ai_provider', $resolved, $this );
 			if ( $filtered instanceof AIProviderInterface ) {
 				return $filtered;

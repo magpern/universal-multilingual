@@ -138,7 +138,7 @@ final class ProviderFrameworkTest extends TestCase {
 			)
 		);
 		$registry = new ProviderRegistry( $settings );
-		$fake     = new FakeProviderStub();
+		$fake     = new \AIMultilingual\Tests\Fixtures\StubAIProvider();
 
 		add_filter( 'aiml_ai_provider', static fn() => $fake );
 		$this->assertSame( 'acceptance-fake', $registry->active()->get_id() );
@@ -313,31 +313,5 @@ final class ProviderFrameworkTest extends TestCase {
 		$this->assertSame( 0.8, $seen['body']['temperature'] ?? null );
 		$this->assertSame( 256, $seen['body']['max_tokens'] ?? null );
 		$this->assertSame( 'disabled', $seen['body']['thinking']['type'] ?? null );
-	}
-}
-
-/**
- * Minimal AIProviderInterface stub for the filter-seam test.
- */
-final class FakeProviderStub implements \AIMultilingual\Translation\AI\AIProviderInterface {
-
-	public function get_id(): string {
-		return 'acceptance-fake';
-	}
-
-	public function get_capabilities(): ProviderCapabilities {
-		return ProviderCapabilities::all();
-	}
-
-	public function test_connection() {
-		return true;
-	}
-
-	public function list_models() {
-		return array( 'fake-1' );
-	}
-
-	public function translate_batch( TranslationBatch $batch ) {
-		return new ProviderResult( array(), 0, 0, 'fake-1' );
 	}
 }

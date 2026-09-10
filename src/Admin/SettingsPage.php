@@ -136,6 +136,7 @@ final class SettingsPage {
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'add_menus' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_settings_assets' ) );
 		add_action( 'admin_notices', array( $this, 'render_strategy_f_admin_notices' ) );
 
 		$this->languages_screen->register();
@@ -303,6 +304,29 @@ final class SettingsPage {
 	/**
 	 * Renders the Settings screen.
 	 */
+	/**
+	 * Loads the shared admin design system on the Settings screen so it reads
+	 * as the same plugin as Languages, Workspace, Site Translate and Jobs
+	 * (AIT1 / ADR-0031, bounded alignment — no functional change).
+	 *
+	 * @param string $hook_suffix Current admin page hook suffix.
+	 */
+	public function enqueue_settings_assets( string $hook_suffix ): void {
+		if ( 'multilingual_page_' . self::SETTINGS_SLUG !== $hook_suffix ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'aiml-admin-ui',
+			plugins_url( 'assets/admin-ui/aiml-ui.css', AIML_PLUGIN_FILE ),
+			array( 'wp-components' ),
+			defined( 'AIML_VERSION' ) ? AIML_VERSION : '0.1.0'
+		);
+	}
+
+	/**
+	 * Renders the plugin settings form.
+	 */
 	public function render_settings(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'You do not have permission to change these settings.', 'universal-multilingual' ) );
@@ -310,8 +334,16 @@ final class SettingsPage {
 
 		$current = $this->settings->get();
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Universal Multilingual Settings', 'universal-multilingual' ) . '</h1>';
+		echo '<div class="aiml-ui-layout">';
+		echo '<header class="aiml-ui-hero">';
+		echo '<span class="aiml-ui-hero__mark"><span class="dashicons dashicons-admin-generic" aria-hidden="true"></span></span>';
+		echo '<span class="aiml-ui-hero__titles">';
+		echo '<h2 class="aiml-ui-hero__title">' . esc_html__( 'Settings', 'universal-multilingual' ) . '</h2>';
+		echo '<p class="aiml-ui-hero__subtitle">' . esc_html__( 'Language switcher, translation extraction, localized URLs and AI translation.', 'universal-multilingual' ) . '</p>';
+		echo '</span></header>';
+		\AIMultilingual\Admin\AdminNavigation::render( self::SETTINGS_SLUG );
 		$this->render_notice();
 		echo '<form method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
 
@@ -361,7 +393,7 @@ final class SettingsPage {
 
 		submit_button();
 
-		echo '</form></div>';
+		echo '</form></div></div>';
 	}
 
 	/**

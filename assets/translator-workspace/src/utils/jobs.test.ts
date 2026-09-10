@@ -249,7 +249,10 @@ describe( 'jobs utils', () => {
 		expect( jobStatusLabel( 'completed_with_errors' ).toLowerCase() ).toContain(
 			'skip'
 		);
-		expect( jobStatusLabel( 'queued' ).toLowerCase() ).toContain( 'wait' );
+		expect( jobStatusLabel( 'queued' ).toLowerCase() ).toContain( 'queue' );
+		expect( jobStatusLabel( 'running' ).toLowerCase() ).toContain(
+			'translat'
+		);
 	} );
 
 	it( 'includes skipped and stale in progress when present', () => {

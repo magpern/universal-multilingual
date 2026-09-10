@@ -16,6 +16,7 @@ use AIMultilingual\Translation\AI\ProviderResult;
 use AIMultilingual\Translation\Extractor;
 use AIMultilingual\Translation\Store;
 use AIMultilingual\Workspace\SegmentAssembler;
+use AIMultilingual\Workspace\TranslatableSegmentEligibility;
 use AIMultilingual\Workspace\TranslationService;
 use WP_Error;
 use WP_Post;
@@ -275,23 +276,15 @@ final class BackgroundTranslationItemProcessor {
 			return null;
 		}
 
-		$review_status = (string) ( $row->review_status ?? Store::REVIEW_NOT_SUBMITTED );
-		if ( in_array(
-			$review_status,
-			array(
-				Store::REVIEW_PENDING,
-				Store::REVIEW_APPROVED,
-				Store::REVIEW_REJECTED,
-			),
-			true
-		) ) {
-			return ItemResult::skipped_conflict( 'Segment is in an active review state.' );
+		$projection = array(
+			'status'        => (string) ( $row->status ?? Store::STATUS_MISSING ),
+			'review_status' => (string) ( $row->review_status ?? Store::REVIEW_NOT_SUBMITTED ),
+		);
+		if ( TranslatableSegmentEligibility::is_protected( $projection ) ) {
+			return ItemResult::skipped_conflict( TranslatableSegmentEligibility::protected_reason( $projection ) );
 		}
 
 		$status = (string) ( $row->status ?? Store::STATUS_MISSING );
-		if ( in_array( $status, array( Store::STATUS_MANUALLY_EDITED, Store::STATUS_REVIEWED ), true ) ) {
-			return ItemResult::skipped_conflict( 'Segment was manually edited or reviewed.' );
-		}
 
 		$translated = trim( (string) ( $row->translated_text ?? '' ) );
 		if ( Store::STATUS_MISSING === $status || '' === $translated ) {

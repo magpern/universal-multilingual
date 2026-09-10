@@ -293,11 +293,18 @@ final class SiteTranslateController {
 			return $result;
 		}
 
+		$autostarted = false;
+		if ( ! empty( $body['autostart'] ) && ! empty( (string) $result['batch_id'] ) ) {
+			$run         = $this->batches->run_batch_now( (string) $result['batch_id'] );
+			$autostarted = ! is_wp_error( $run );
+		}
+
 		$status = ! empty( $result['complete'] ) ? 201 : 207;
 
 		return $this->respond(
 			array(
 				'batch_id'        => $result['batch_id'],
+				'autostarted'     => $autostarted,
 				'complete'        => (bool) $result['complete'],
 				'created_count'   => (int) $result['created_count'],
 				'attempted_count' => (int) $result['attempted_count'],
@@ -503,6 +510,13 @@ final class SiteTranslateController {
 			if ( isset( $body[ $optional_string ] ) && '' !== (string) $body[ $optional_string ] ) {
 				$args[ $optional_string ] = sanitize_text_field( (string) $body[ $optional_string ] );
 			}
+		}
+
+		// The bulk mode selector (AIT1): missing -> bulk_translate,
+		// stale -> retranslate_stale, machine -> retranslate_machine. The
+		// coordinator ignores any other value.
+		if ( isset( $body['job_type'] ) && '' !== (string) $body['job_type'] ) {
+			$args['job_type'] = sanitize_key( (string) $body['job_type'] );
 		}
 
 		foreach ( array( 'budget_max_requests', 'budget_max_tokens', 'budget_warning_pct', 'glossary_version_intended' ) as $optional_int ) {

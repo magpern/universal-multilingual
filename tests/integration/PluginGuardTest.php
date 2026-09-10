@@ -1540,16 +1540,20 @@ final class PluginGuardTest extends AimlTestCase {
 		$this->assertMatchesRegularExpression( '/Version:\s*1\.14\.0/', $version );
 
 		$service = (string) file_get_contents( $this->root() . '/src/Jobs/BackgroundTranslationJobService.php' );
-		$this->assertStringContainsString( 'job_type_resolves_missing', $service );
+		// AIT1 (ADR-0031) folded P2's job_type_resolves_missing into the shared
+		// job_type_mode() → TranslatableSegmentEligibility policy.
+		$this->assertStringContainsString( 'job_type_mode', $service );
 		$this->assertStringContainsString( 'JobTypes::BULK_TRANSLATE', $service );
 		$this->assertStringNotContainsString( 'silent_overwrite', $service );
 
 		$types = (string) file_get_contents( $this->root() . '/src/Jobs/JobTypes.php' );
 		$this->assertStringContainsString( 'BULK_TRANSLATE', $types );
+		// AIT1 adds exactly one job type: retranslate_machine (ADR-0031).
+		$this->assertStringContainsString( 'RETRANSLATE_MACHINE', $types );
 		$this->assertSame(
-			4,
+			5,
 			substr_count( $types, 'public const' ),
-			'P2 must not introduce a new JobTypes constant.'
+			'AIT1 adds retranslate_machine and no other JobTypes constant.'
 		);
 
 		$this->assertFileExists( $this->root() . '/docs/plans/P2_JOBS_STALE_OPERATOR_LITERACY_IMPLEMENTATION_PLAN.md' );

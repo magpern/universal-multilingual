@@ -1,0 +1,600 @@
+/*
+ * Universal Multilingual — shared admin design system (AIT1 / ADR-0031).
+ *
+ * Extracted from the Languages screen so the Languages, Settings, Translator
+ * Workspace, Site Translate and Jobs screens read as one plugin. Aligned with
+ * the Universal Multicurrency admin design system (tokens re-prefixed aiml-*,
+ * copied not loaded). Every rule is scoped under the `.aiml-ui` root class so
+ * no WordPress admin control is restyled globally. Screen-specific tweaks stay
+ * in each screen's own stylesheet, which declares `aiml-admin-ui` as a
+ * dependency via wp_enqueue_style (never a CSS @import).
+ */
+
+.aiml-ui {
+	--aiml-accent: #6c3cff;
+	--aiml-accent-hover: #5a2ef2;
+	--aiml-accent-soft: #f3f0ff;
+	--aiml-border: #e5e7eb;
+	--aiml-text: #1f2937;
+	--aiml-muted: #6b7280;
+	--aiml-surface: #ffffff;
+	--aiml-success: #10b981;
+	--aiml-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+	--aiml-radius: 14px;
+	--aiml-space-1: 8px;
+	--aiml-space-2: 16px;
+	--aiml-space-3: 24px;
+
+	--aiml-ui-neutral-50: #f9fafb;
+	--aiml-ui-neutral-100: #f3f4f6;
+	--aiml-ui-neutral-200: #e5e7eb;
+	--aiml-ui-neutral-300: #d1d5db;
+	--aiml-ui-neutral-700: #374151;
+	--aiml-ui-neutral-900: #111827;
+	--aiml-ui-pill-radius: 999px;
+	--aiml-ui-card-radius: 16px;
+	--aiml-ui-card-divider: rgba(17, 24, 39, 0.08);
+	--aiml-ui-transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+	--aiml-ui-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+	--aiml-ui-shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+	--aiml-ui-readable-width: 900px;
+}
+
+.aiml-ui .wrap > h1 {
+	/* The hero replaces the stock heading. */
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(1px, 1px, 1px, 1px);
+	white-space: nowrap;
+}
+
+.aiml-ui .aiml-ui-layout {
+	max-width: var(--aiml-ui-readable-width);
+	display: grid;
+	gap: var(--aiml-space-3);
+	margin-top: var(--aiml-space-2);
+}
+
+/* Hero header */
+.aiml-ui-hero {
+	display: flex;
+	align-items: center;
+	gap: var(--aiml-space-2);
+	background: var(--aiml-surface);
+	border: 1px solid var(--aiml-border);
+	border-radius: var(--aiml-radius);
+	box-shadow: var(--aiml-shadow);
+	padding: var(--aiml-space-3);
+}
+
+.aiml-ui-hero__mark {
+	display: grid;
+	place-items: center;
+	width: 48px;
+	height: 48px;
+	border-radius: 999px;
+	background: var(--aiml-accent-soft);
+	flex-shrink: 0;
+}
+
+.aiml-ui-hero__mark .dashicons {
+	color: var(--aiml-accent);
+	font-size: 24px;
+	width: 24px;
+	height: 24px;
+}
+
+.aiml-ui-hero__title {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--aiml-text);
+}
+
+.aiml-ui-hero__subtitle {
+	margin: 4px 0 0;
+	color: var(--aiml-muted);
+	font-size: 14px;
+	line-height: 1.4;
+}
+
+/* Notices */
+.aiml-ui-panel {
+	padding: 16px 18px;
+	border-radius: var(--aiml-ui-card-radius);
+	border: 1px solid transparent;
+	margin: 0;
+}
+
+.aiml-ui-panel--info { background: #f0f6ff; border-color: #c7d9ff; }
+.aiml-ui-panel--warning { background: #fffbeb; border-color: #fde68a; }
+.aiml-ui-panel--success { background: #ecfdf5; border-color: #a7f3d0; }
+.aiml-ui-panel--error { background: #fef2f2; border-color: #fecdca; }
+
+.aiml-ui-panel__message {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.6;
+	color: var(--aiml-ui-neutral-700);
+}
+
+/* Cards */
+.aiml-ui-card {
+	border: 1px solid var(--aiml-ui-card-divider);
+	border-radius: var(--aiml-ui-card-radius);
+	background: #fff;
+	box-shadow: var(--aiml-ui-shadow-sm);
+	overflow: hidden;
+}
+
+.aiml-ui-card__header {
+	padding: 20px 24px 0;
+}
+
+.aiml-ui-card__title {
+	margin: 0 0 6px;
+	font-size: 1.0625rem;
+	font-weight: 650;
+	letter-spacing: -0.015em;
+	line-height: 1.35;
+	color: var(--aiml-ui-neutral-900);
+}
+
+.aiml-ui-card__description {
+	margin: 0;
+	max-width: 60ch;
+	color: var(--aiml-muted);
+	font-size: 0.875rem;
+	line-height: 1.55;
+}
+
+.aiml-ui-card__divider {
+	height: 1px;
+	margin: 18px 24px 0;
+	background: var(--aiml-ui-card-divider);
+}
+
+.aiml-ui-card__body {
+	display: grid;
+	gap: 14px;
+	padding: 18px 24px 24px;
+}
+
+.aiml-ui-card__body .form-table,
+.aiml-ui-card__body .form-table tbody,
+.aiml-ui-card__body .form-table tr,
+.aiml-ui-card__body .form-table th,
+.aiml-ui-card__body .form-table td {
+	display: block;
+	width: auto;
+	padding: 0;
+	border: 0;
+}
+
+/* Field rows */
+.aiml-ui-field {
+	display: grid;
+	gap: 8px;
+	padding: 14px 16px;
+	border-radius: 12px;
+	background: var(--aiml-ui-neutral-50);
+}
+
+.aiml-ui-field__label {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--aiml-ui-neutral-900);
+}
+
+.aiml-ui-field__description {
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--aiml-muted);
+}
+
+.aiml-ui-field__control select,
+.aiml-ui-field__control input[type="text"],
+.aiml-ui-field__control input[type="number"] {
+	max-width: 100%;
+	min-height: 36px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	border-color: var(--aiml-ui-neutral-200);
+}
+
+.aiml-ui-field__control input[type="number"] {
+	width: 8em;
+}
+
+.aiml-ui-field--hidden {
+	display: none;
+}
+
+/* Read-only derived summary */
+.aiml-ui-summary {
+	display: grid;
+	gap: 8px;
+	padding: 16px;
+	border-radius: 12px;
+	border: 1px solid var(--aiml-ui-card-divider);
+	background: linear-gradient(180deg, #fff 0%, var(--aiml-ui-neutral-50) 100%);
+}
+
+.aiml-ui-summary__title {
+	margin: 0;
+	font-size: 0.75rem;
+	font-weight: 650;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--aiml-muted);
+}
+
+.aiml-ui-summary__grid {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 6px 16px;
+	margin: 0;
+}
+
+.aiml-ui-summary__grid dt {
+	color: var(--aiml-muted);
+	font-size: 0.8125rem;
+}
+
+.aiml-ui-summary__grid dd {
+	margin: 0;
+	font-size: 0.8125rem;
+	color: var(--aiml-ui-neutral-900);
+	font-weight: 600;
+}
+
+.aiml-ui-summary__grid code {
+	background: var(--aiml-ui-neutral-100);
+	border-radius: 4px;
+	padding: 1px 6px;
+}
+
+/* Status badge */
+.aiml-ui-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 4px 10px 4px 8px;
+	border-radius: var(--aiml-ui-pill-radius);
+	background: var(--aiml-ui-neutral-100);
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--aiml-ui-neutral-900);
+}
+
+.aiml-ui-badge__dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: #9ca3af;
+	flex-shrink: 0;
+}
+
+.aiml-ui-badge--published { background: #ecfdf5; color: #047857; }
+.aiml-ui-badge--published .aiml-ui-badge__dot { background: var(--aiml-success); }
+.aiml-ui-badge--preview { background: #eff6ff; color: #1d4ed8; }
+.aiml-ui-badge--preview .aiml-ui-badge__dot { background: #3b82f6; }
+.aiml-ui-badge--disabled { background: var(--aiml-ui-neutral-100); color: var(--aiml-muted); }
+
+/* Language list */
+.aiml-ui-list {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.aiml-ui-list th {
+	text-align: left;
+	font-size: 0.75rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--aiml-muted);
+	padding: 0 16px 10px;
+}
+
+.aiml-ui-list td {
+	padding: 12px 16px;
+	border-top: 1px solid var(--aiml-ui-card-divider);
+	font-size: 0.875rem;
+	vertical-align: middle;
+}
+
+.aiml-ui-list td code {
+	background: var(--aiml-ui-neutral-100);
+	border-radius: 4px;
+	padding: 1px 6px;
+}
+
+/* Empty state */
+.aiml-ui-empty {
+	text-align: center;
+	padding: 32px 24px;
+	border: 1px dashed var(--aiml-ui-neutral-200);
+	border-radius: var(--aiml-ui-card-radius);
+	background: var(--aiml-ui-neutral-50);
+	color: var(--aiml-muted);
+	font-size: 0.875rem;
+}
+
+/* Buttons */
+.aiml-ui .aiml-ui-card .button-primary {
+	background: var(--aiml-accent);
+	border-color: var(--aiml-accent);
+	border-radius: 8px;
+	box-shadow: none;
+	text-shadow: none;
+	min-height: 40px;
+	padding-inline: 20px;
+	font-weight: 600;
+}
+
+.aiml-ui .aiml-ui-card .button-primary:hover,
+.aiml-ui .aiml-ui-card .button-primary:focus {
+	background: var(--aiml-accent-hover);
+	border-color: var(--aiml-accent-hover);
+}
+
+/* Advanced / custom disclosure */
+.aiml-ui-advanced {
+	border: 1px solid var(--aiml-ui-card-divider);
+	border-radius: var(--aiml-ui-card-radius);
+	background: #fff;
+	padding: 4px 20px;
+}
+
+.aiml-ui-advanced > summary {
+	cursor: pointer;
+	padding: 14px 0;
+	font-weight: 600;
+	color: var(--aiml-ui-neutral-900);
+	list-style: none;
+}
+
+.aiml-ui-advanced > summary::-webkit-details-marker { display: none; }
+
+.aiml-ui-advanced[open] > summary {
+	border-bottom: 1px solid var(--aiml-ui-card-divider);
+	margin-bottom: 14px;
+}
+
+/* Combobox (wp.components.ComboboxControl) fitted to a field row */
+.aiml-ui-field .components-combobox-control__suggestions-container {
+	max-width: 420px;
+}
+
+.aiml-ui-field .components-form-token-field__input-container,
+.aiml-ui-field .components-base-control__field .components-text-control__input {
+	min-height: 36px;
+	border-radius: 8px;
+}
+
+/* Focus visibility */
+.aiml-ui .aiml-ui-field :is(select, input):focus {
+	outline: 2px solid var(--aiml-accent);
+	outline-offset: 1px;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+	.aiml-ui-hero {
+		flex-direction: column;
+		align-items: flex-start;
+		text-align: left;
+	}
+
+	.aiml-ui-card__header,
+	.aiml-ui-card__body {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+
+	.aiml-ui-summary__grid {
+		grid-template-columns: 1fr;
+		gap: 2px 0;
+	}
+
+	.aiml-ui-list thead {
+		display: none;
+	}
+
+	.aiml-ui-list td {
+		display: block;
+		border-top: 0;
+	}
+
+	.aiml-ui-list tr {
+		display: block;
+		border-top: 1px solid var(--aiml-ui-card-divider);
+		padding: 6px 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.aiml-ui * {
+		transition: none !important;
+	}
+}
+
+/* ===================================================================
+ * AIT1 — AI translation surface primitives (ADR-0031)
+ * =================================================================== */
+
+/* Translation-state badges. Execution axis and review axis are separate
+ * badges — never merged into one. */
+.aiml-ui-badge--missing { background: var(--aiml-ui-neutral-100); color: var(--aiml-muted); }
+.aiml-ui-badge--missing .aiml-ui-badge__dot { background: #9ca3af; }
+
+.aiml-ui-badge--queued { background: var(--aiml-ui-neutral-100); color: var(--aiml-ui-neutral-700); }
+.aiml-ui-badge--queued .aiml-ui-badge__dot { background: #9ca3af; }
+
+.aiml-ui-badge--translating { background: #eff6ff; color: #1d4ed8; }
+.aiml-ui-badge--translating .aiml-ui-badge__dot {
+	background: #3b82f6;
+	animation: aiml-ui-pulse 1.4s ease-in-out infinite;
+}
+
+.aiml-ui-badge--stale { background: #fffbeb; color: #8a4b00; }
+.aiml-ui-badge--stale .aiml-ui-badge__dot { background: #f59e0b; }
+
+.aiml-ui-badge--complete { background: #ecfdf5; color: #047857; }
+.aiml-ui-badge--complete .aiml-ui-badge__dot { background: var(--aiml-success); }
+
+.aiml-ui-badge--completed-with-skips { background: #f0f6ff; color: #1d4ed8; }
+.aiml-ui-badge--completed-with-skips .aiml-ui-badge__dot { background: #3b82f6; }
+
+.aiml-ui-badge--failed { background: #fef2f2; color: #b91c1c; }
+.aiml-ui-badge--failed .aiml-ui-badge__dot { background: #ef4444; }
+
+.aiml-ui-badge--needs-review { background: var(--aiml-accent-soft); color: var(--aiml-accent-hover); }
+.aiml-ui-badge--needs-review .aiml-ui-badge__dot { background: var(--aiml-accent); }
+
+.aiml-ui-badge--reviewed { background: #ecfdf5; color: #047857; }
+.aiml-ui-badge--reviewed .aiml-ui-badge__dot { background: var(--aiml-success); }
+
+@keyframes aiml-ui-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.aiml-ui-badge--translating .aiml-ui-badge__dot { animation: none; }
+}
+
+/* Primary action bar: makes "Translate with AI" the obvious primary next to
+ * its mode selector and a status badge. */
+.aiml-ui-actionbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--aiml-space-2);
+	padding: 16px 18px;
+	border: 1px solid var(--aiml-ui-card-divider);
+	border-radius: var(--aiml-ui-card-radius);
+	background: linear-gradient(180deg, #fff 0%, var(--aiml-ui-neutral-50) 100%);
+}
+
+.aiml-ui-actionbar__primary { margin: 0; }
+
+.aiml-ui-actionbar__mode { min-width: 220px; }
+
+.aiml-ui-actionbar__status { margin-left: auto; }
+
+.aiml-ui-actionbar__hint {
+	flex-basis: 100%;
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--aiml-muted);
+}
+
+/* Plain-language job / batch progress. */
+.aiml-ui-progress {
+	display: grid;
+	gap: 6px;
+}
+
+.aiml-ui-progress__label {
+	font-size: 0.8125rem;
+	color: var(--aiml-ui-neutral-700);
+}
+
+.aiml-ui-progress__track {
+	height: 8px;
+	border-radius: 999px;
+	background: var(--aiml-ui-neutral-200);
+	overflow: hidden;
+}
+
+.aiml-ui-progress__bar {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--aiml-accent);
+	transition: width var(--aiml-ui-transition);
+}
+
+.aiml-ui-progress__bar--failed { background: #ef4444; }
+.aiml-ui-progress__bar--complete { background: var(--aiml-success); }
+
+/* Internal section navigation — shared across every Universal Multilingual
+ * admin screen (AIT1). Compact wrapping pills; the active tab is marked by a
+ * filled accent bar, not colour alone. No JS. */
+.aiml-ui-subnav {
+	margin: var(--aiml-space-2) 0;
+}
+
+.aiml-ui-subnav__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	border: 1px solid var(--aiml-ui-card-divider);
+	border-radius: var(--aiml-ui-card-radius);
+	background: var(--aiml-surface);
+	box-shadow: var(--aiml-ui-shadow-sm);
+}
+
+.aiml-ui-subnav__item {
+	margin: 0;
+}
+
+.aiml-ui-subnav__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: var(--aiml-ui-pill-radius);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--aiml-ui-neutral-700);
+	text-decoration: none;
+	background: transparent;
+	border: 1px solid transparent;
+	transition: background var(--aiml-ui-transition), color var(--aiml-ui-transition);
+}
+
+.aiml-ui-subnav__link:hover,
+.aiml-ui-subnav__link:focus {
+	background: var(--aiml-ui-neutral-100);
+	color: var(--aiml-ui-neutral-900);
+}
+
+.aiml-ui-subnav__link:focus-visible {
+	outline: 2px solid var(--aiml-accent);
+	outline-offset: 1px;
+}
+
+.aiml-ui-subnav__link--active {
+	color: #fff;
+	background: var(--aiml-accent);
+}
+
+.aiml-ui-subnav__link--active::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: #fff;
+	flex-shrink: 0;
+}
+
+.aiml-ui-subnav__link--active:hover,
+.aiml-ui-subnav__link--active:focus {
+	background: var(--aiml-accent-hover);
+	color: #fff;
+}
+
+@media (max-width: 782px) {
+	.aiml-ui-subnav__list {
+		padding: 8px;
+	}
+}

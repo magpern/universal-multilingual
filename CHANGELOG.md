@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### User-initiated AI translation — page + bulk (ADR-0031)
+
+- **"Translate with AI"** on the Translator Workspace editor: one primary
+  action translates a page's eligible segments. A mode selector offers
+  **Translate missing** (default), **Retranslate stale** and **Retranslate AI
+  translations**. The action creates a background job, starts it immediately,
+  polls status, refreshes the editor and reports
+  `N translated · M kept · F failed` — with any review need shown separately.
+  Disabled (never hidden) with a *Configure AI settings* link when AI is not
+  configured.
+- The legacy **Translate** screen is no longer an AI dead end: it deep-links
+  into the Workspace AI flow with the post and target language preselected,
+  plus an *Open in Translator Workspace* link.
+- **Site Translate**: a mode selector and a single **Translate selected with
+  AI** action that creates and starts the batch; pre-selects content passed
+  from the new Pages/Posts list-table **Translate with AI** bulk action.
+- New `retranslate_machine` job type — replaces every eligible machine
+  translation for an object regardless of stale state.
+- New **Settings | Overview** links and a **Documentation** meta link on the
+  Plugins screen.
+- A shared **internal navigation bar** (`.aiml-ui-subnav`) at the top of every
+  Universal Multilingual admin screen — Languages, Settings, Limited Rollout,
+  SEO Diagnostics, Translate, Workspace, Glossary, Translation Promotion — so an
+  operator can move between areas without the WordPress sidebar. One renderer
+  (`src/Admin/AdminNavigation`); each tab maps to the owning screen's existing
+  slug constant and existing capability, so a section the current user cannot
+  open never appears. No JavaScript; the active tab is marked by a filled accent
+  pill and `aria-current="page"`.
+
+### Changed
+
+- **Manual, reviewed and in-review translations are never overwritten by a
+  page or bulk AI action, in any mode.** A single shared policy
+  (`TranslatableSegmentEligibility`) now governs the synchronous workspace
+  "Translate selected" path as well as the background worker and job
+  materialisation — closing a gap where the synchronous path could overwrite
+  a human's translation. Protected segments are reported as *skipped*.
+- User-facing AI actions carry an automatic, invisible idempotency token; a
+  double-click or a retry after a timeout collapses to one job, while a
+  deliberate re-run after completion is new work.
+- The `aiml-ui` admin design system is extracted to
+  `assets/admin-ui/aiml-ui.css` and shared by Languages, Settings, the
+  Translator Workspace, Site Translate and Jobs. Job status reads in plain
+  language (Queued / Translating / Completed / Completed with skips / Failed);
+  execution status and review status render as separate badges.
+- The generic `POST aiml/v1/jobs` and Site Translate create endpoints accept
+  an explicit `autostart` flag; without it they keep their deliberate
+  create-then-run behaviour.
+
 ## [1.14.0] - 2026-09-09
 
 ### Added

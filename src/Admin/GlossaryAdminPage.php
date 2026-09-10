@@ -113,8 +113,9 @@ final class GlossaryAdminPage {
 			wp_die( esc_html__( 'Unauthorized.', 'universal-multilingual' ) );
 		}
 
-		echo '<div class="wrap aiml-glossary-admin">';
+		echo '<div class="wrap aiml-ui aiml-glossary-admin">';
 		echo '<h1>' . esc_html__( 'Glossary', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 		echo '<p>' . esc_html__( 'Curated platform terminology for translation suggestions, AI context, and QA warnings.', 'universal-multilingual' ) . '</p>';
 		echo '<div id="aiml-glossary-admin-root"></div>';
 		echo '</div>';

@@ -31,7 +31,7 @@ final class TranslatorWorkspace {
 	 * capability the user already holds; never granted as a real role
 	 * capability so it cannot drift from the two source capabilities.
 	 */
-	private const ACCESS_CAP = 'aiml_workspace_access';
+	public const ACCESS_CAP = 'aiml_workspace_access';
 
 	/**
 	 * Language registry.
@@ -126,11 +126,18 @@ final class TranslatorWorkspace {
 			true
 		);
 
+		wp_enqueue_style(
+			'aiml-admin-ui',
+			plugins_url( 'assets/admin-ui/aiml-ui.css', AIML_PLUGIN_FILE ),
+			array( 'wp-components' ),
+			defined( 'AIML_VERSION' ) ? AIML_VERSION : $version
+		);
+
 		if ( is_readable( $plugin_dir . 'assets/translator-workspace/build/style-index.css' ) ) {
 			wp_enqueue_style(
 				self::STYLE_HANDLE,
 				plugins_url( 'assets/translator-workspace/build/style-index.css', AIML_PLUGIN_FILE ),
-				array( 'wp-components' ),
+				array( 'wp-components', 'aiml-admin-ui' ),
 				$version
 			);
 		}
@@ -144,6 +151,10 @@ final class TranslatorWorkspace {
 				'languages'           => $this->language_bootstrap(),
 				'initialPostId'       => isset( $_GET['post_id'] ) ? (int) $_GET['post_id'] : 0, // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 				'initialLanguageCode' => isset( $_GET['language'] ) ? sanitize_key( wp_unslash( (string) $_GET['language'] ) ) : '', // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				'aiConfigured'        => \AIMultilingual\Translation\AI\ProviderRegistry::is_ai_configured( new \AIMultilingual\Settings() ),
+				'aiSettingsUrl'       => current_user_can( 'manage_options' )
+					? admin_url( 'admin.php?page=' . SettingsPage::SETTINGS_SLUG )
+					: '',
 				'canTranslate'        => current_user_can( Plugin::CAPABILITY ),
 				'canReview'           => current_user_can( ReviewCapabilities::REVIEW_TRANSLATIONS ),
 				'canAccessOperations' => current_user_can( Plugin::CAPABILITY ) || current_user_can( ReviewCapabilities::REVIEW_TRANSLATIONS ),
@@ -165,8 +176,9 @@ final class TranslatorWorkspace {
 			wp_die( esc_html__( 'You do not have permission to access the translator workspace.', 'universal-multilingual' ) );
 		}
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Translator workspace', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 
 		if ( ! is_readable( plugin_dir_path( AIML_PLUGIN_FILE ) . 'assets/translator-workspace/build/index.js' ) ) {
 			echo '<div class="notice notice-error"><p>';

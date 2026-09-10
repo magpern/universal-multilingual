@@ -1,0 +1,11 @@
+{
+  "name": "aiml-ai-translation-browser",
+  "private": true,
+  "description": "AIT1 — AI translation admin acceptance suite (fake provider, no paid calls).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.1"
+  }
+}

@@ -114,8 +114,9 @@ final class Editor {
 
 		$targets = $this->target_languages();
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap aiml-ui">';
 		echo '<h1>' . esc_html__( 'Translate', 'universal-multilingual' ) . '</h1>';
+		AdminNavigation::render( self::MENU_SLUG );
 
 		$this->render_notice();
 
@@ -291,6 +292,8 @@ final class Editor {
 
 		echo '<h2>' . esc_html( get_the_title( $post ) ) . '</h2>';
 
+		$this->render_ai_bridge( $post, $language_id );
+
 		if ( $this->extractor->uses_block_workspace( $post ) ) {
 			$this->render_workspace_deferral_notice( $post, $language_id );
 		} elseif ( Extractor::BODY_OK !== $body_state ) {
@@ -426,6 +429,48 @@ final class Editor {
 
 		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/**
+	 * Bridges the legacy screen into the Translator Workspace AI flow so it is
+	 * never an AI dead end (AIT1 / ADR-0031). The AI action is orchestrated in
+	 * one place — the Workspace + Jobs — so this deep-links there with the post
+	 * and target language preselected rather than creating a job here.
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 */
+	private function render_ai_bridge( WP_Post $post, int $language_id ): void {
+		$language = $this->languages->find( $language_id );
+		$code     = null !== $language ? (string) $language->code : '';
+
+		$workspace_url = add_query_arg(
+			array(
+				'page'     => TranslatorWorkspace::MENU_SLUG,
+				'post_id'  => (int) $post->ID,
+				'language' => $code,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		echo '<p class="aiml-editor-ai-bridge">';
+		printf(
+			'<a class="button button-primary" href="%1$s">%2$s</a> ',
+			esc_url( add_query_arg( 'aiml_ai', '1', $workspace_url ) ),
+			esc_html__( 'Translate with AI', 'universal-multilingual' )
+		);
+		printf(
+			'<a class="button" href="%1$s">%2$s</a>',
+			esc_url( $workspace_url ),
+			esc_html__( 'Open in Translator Workspace', 'universal-multilingual' )
+		);
+		echo '</p>';
+		echo '<p class="description">';
+		esc_html_e(
+			'AI translation and the segment editor live in the Translator Workspace. The fields below remain for quick manual edits.',
+			'universal-multilingual'
+		);
+		echo '</p>';
 	}
 
 	/**

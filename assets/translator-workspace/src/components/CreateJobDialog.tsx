@@ -122,8 +122,14 @@ export default function CreateJobDialog( {
 		<Modal
 			title={ __( 'Create translation job', 'ai-multilingual' ) }
 			onRequestClose={ resetAndClose }
-			className="aiml-create-job-dialog"
+			className="aiml-create-job-dialog aiml-ui"
 		>
+			<p className="aiml-ui-panel aiml-ui-panel--info aiml-ui-panel__message">
+				{ __(
+					'For a single page, use "Translate with AI" on the editor screen. This dialog is for operators who need explicit control over job type and workload.',
+					'ai-multilingual'
+				) }
+			</p>
 			<SelectControl
 				__nextHasNoMarginBottom
 				label={ __( 'Job type', 'ai-multilingual' ) }
@@ -172,17 +178,20 @@ export default function CreateJobDialog( {
 				</>
 			) }
 
-			<TextControl
-				__nextHasNoMarginBottom
-				label={ __( 'Idempotency token (optional)', 'ai-multilingual' ) }
-				help={ __(
-					'Reuse the same token to safely retry an identical create request.',
-					'ai-multilingual'
-				) }
-				value={ clientToken }
-				onChange={ setClientToken }
-				disabled={ busy }
-			/>
+			<details className="aiml-ui-advanced">
+				<summary>{ __( 'Advanced', 'ai-multilingual' ) }</summary>
+				<TextControl
+					__nextHasNoMarginBottom
+					label={ __( 'Idempotency token (optional)', 'ai-multilingual' ) }
+					help={ __(
+						'Reuse the same token to safely retry an identical create request.',
+						'ai-multilingual'
+					) }
+					value={ clientToken }
+					onChange={ setClientToken }
+					disabled={ busy }
+				/>
+			</details>
 
 			{ error && (
 				<Notice status="error" isDismissible={ false }>

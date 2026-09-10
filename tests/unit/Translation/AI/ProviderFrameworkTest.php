@@ -69,6 +69,54 @@ final class ProviderFrameworkTest extends TestCase {
 		$this->assertSame( NullAIProvider::ID, $registry->active()->get_id() );
 	}
 
+	public function test_is_ai_configured_requires_enabled_provider_and_key(): void {
+		$this->assertFalse(
+			ProviderRegistry::is_ai_configured(
+				new Settings(
+					array(
+						'ai_enabled'  => false,
+						'ai_provider' => 'openai',
+					)
+				)
+			)
+		);
+		$this->assertFalse(
+			ProviderRegistry::is_ai_configured(
+				new Settings(
+					array(
+						'ai_enabled'  => true,
+						'ai_provider' => '',
+					)
+				)
+			),
+			'a provider must be selected'
+		);
+		$this->assertFalse(
+			ProviderRegistry::is_ai_configured(
+				new Settings(
+					array(
+						'ai_enabled'  => true,
+						'ai_provider' => 'openai',
+					)
+				)
+			),
+			'a stored credential is required'
+		);
+		$this->assertTrue(
+			ProviderRegistry::is_ai_configured(
+				new Settings(
+					array(
+						'ai_enabled'   => true,
+						'ai_provider'  => 'openai',
+						'ai_providers' => array(
+							'openai' => array( 'api_key_encrypted' => 'aiml1:abc' ),
+						),
+					)
+				)
+			)
+		);
+	}
+
 	public function test_registry_resolves_active_openai(): void {
 		$settings = new Settings(
 			array(
@@ -80,6 +128,23 @@ final class ProviderFrameworkTest extends TestCase {
 		$registry->register( new OpenAIProvider( 'sk-test' ) );
 
 		$this->assertSame( OpenAIProvider::ID, $registry->active()->get_id() );
+	}
+
+	public function test_aiml_ai_provider_filter_overrides_the_active_provider(): void {
+		$settings = new Settings(
+			array(
+				'ai_enabled'  => false,
+				'ai_provider' => '',
+			)
+		);
+		$registry = new ProviderRegistry( $settings );
+		$fake     = new \AIMultilingual\Tests\Fixtures\StubAIProvider();
+
+		add_filter( 'aiml_ai_provider', static fn() => $fake );
+		$this->assertSame( 'acceptance-fake', $registry->active()->get_id() );
+		remove_all_filters( 'aiml_ai_provider' );
+
+		$this->assertSame( NullAIProvider::ID, $registry->active()->get_id() );
 	}
 
 	public function test_openai_list_models_via_injected_http(): void {

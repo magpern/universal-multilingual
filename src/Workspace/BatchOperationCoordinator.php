@@ -34,14 +34,27 @@ final class BatchOperationCoordinator {
 	private TranslationService $translation;
 
 	/**
+	 * Segment assembly for the shared AI-write eligibility check.
+	 *
+	 * @var SegmentAssembler|null
+	 */
+	private ?SegmentAssembler $assembler;
+
+	/**
 	 * Builds the collaborator.
 	 *
-	 * @param WorkspaceService   $workspace   Workspace command facade.
-	 * @param TranslationService $translation Auto-translate service.
+	 * @param WorkspaceService      $workspace   Workspace command facade.
+	 * @param TranslationService    $translation Auto-translate service.
+	 * @param SegmentAssembler|null $assembler  Segment assembly (manual-protection gate).
 	 */
-	public function __construct( WorkspaceService $workspace, TranslationService $translation ) {
+	public function __construct(
+		WorkspaceService $workspace,
+		TranslationService $translation,
+		?SegmentAssembler $assembler = null
+	) {
 		$this->workspace   = $workspace;
 		$this->translation = $translation;
+		$this->assembler   = $assembler;
 	}
 
 	/**
@@ -160,6 +173,7 @@ final class BatchOperationCoordinator {
 
 		$succeeded = array();
 		$failed    = array();
+		$skipped   = array();
 
 		foreach ( $segment_keys as $segment_key ) {
 			$key = (string) $segment_key;
@@ -168,6 +182,18 @@ final class BatchOperationCoordinator {
 					'segment_key' => '',
 					'code'        => 'aiml_invalid_segment',
 					'message'     => __( 'Segment key is required.', 'universal-multilingual' ),
+				);
+				continue;
+			}
+
+			if ( $this->is_manually_protected( $post, $language_id, $key ) ) {
+				$skipped[] = array(
+					'segment_key' => $key,
+					'code'        => 'aiml_manual_translation_protected',
+					'message'     => __(
+						'Skipped: this translation was edited or reviewed by a person and is never replaced by AI.',
+						'universal-multilingual'
+					),
 				);
 				continue;
 			}
@@ -192,10 +218,10 @@ final class BatchOperationCoordinator {
 			$succeeded[] = $result;
 		}
 
-		if ( array() === $failed ) {
-			$status = 'completed';
-		} elseif ( array() === $succeeded ) {
+		if ( array() !== $failed && array() === $succeeded ) {
 			$status = 'failed';
+		} elseif ( array() === $failed ) {
+			$status = 'completed';
 		} else {
 			$status = 'partial';
 		}
@@ -205,6 +231,29 @@ final class BatchOperationCoordinator {
 			'job_id'   => null,
 			'segments' => $succeeded,
 			'errors'   => $failed,
+			'skipped'  => $skipped,
 		);
+	}
+
+	/**
+	 * Whether a person owns this segment's translation, so an AI batch action
+	 * must skip it (shared policy — ADR-0031). Fail open only when segment
+	 * assembly is unavailable (unit-test wiring); the Jobs path still guards.
+	 *
+	 * @param WP_Post $post        Canonical post.
+	 * @param int     $language_id Target language id.
+	 * @param string  $segment_key Segment key.
+	 */
+	private function is_manually_protected( WP_Post $post, int $language_id, string $segment_key ): bool {
+		if ( null === $this->assembler ) {
+			return false;
+		}
+
+		$assembled = $this->assembler->assemble_one( $post, $language_id, $segment_key );
+		if ( null === $assembled ) {
+			return false;
+		}
+
+		return TranslatableSegmentEligibility::is_protected( $assembled );
 	}
 }

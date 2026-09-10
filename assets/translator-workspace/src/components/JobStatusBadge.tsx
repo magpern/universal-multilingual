@@ -1,6 +1,7 @@
-import { __, sprintf } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 
-import { jobStatusLabel } from '../utils/jobs';
+import { jobStatusBadgeVariant, jobStatusLabel } from '../utils/jobs';
+import StatusBadge from './StatusBadge';
 
 interface JobStatusBadgeProps {
 	status: string;
@@ -11,23 +12,31 @@ export default function JobStatusBadge( {
 	status,
 	requestedAction = 'none',
 }: JobStatusBadgeProps ) {
-	const label =
-		'pause' === requestedAction
-			? __( 'Pause requested', 'ai-multilingual' )
-			: 'cancel' === requestedAction
-				? __( 'Cancel requested', 'ai-multilingual' )
-				: jobStatusLabel( status );
+	if ( 'pause' === requestedAction ) {
+		return (
+			<StatusBadge
+				variant="queued"
+				label={ __( 'Pause requested', 'ai-multilingual' ) }
+				kind={ __( 'Job status', 'ai-multilingual' ) }
+			/>
+		);
+	}
+
+	if ( 'cancel' === requestedAction ) {
+		return (
+			<StatusBadge
+				variant="failed"
+				label={ __( 'Cancel requested', 'ai-multilingual' ) }
+				kind={ __( 'Job status', 'ai-multilingual' ) }
+			/>
+		);
+	}
 
 	return (
-		<span
-			className={ `aiml-job-badge aiml-job-badge--${ status }` }
-			aria-label={ sprintf(
-				/* translators: %s: job status */
-				__( 'Job status: %s', 'ai-multilingual' ),
-				label
-			) }
-		>
-			{ label }
-		</span>
+		<StatusBadge
+			variant={ jobStatusBadgeVariant( status ) }
+			label={ jobStatusLabel( status ) }
+			kind={ __( 'Job status', 'ai-multilingual' ) }
+		/>
 	);
 }

@@ -1040,6 +1040,9 @@ final class Plugin {
 			( new SeoDiagnosticsAdminPage( $seo_diagnostics ) )->register();
 			( new Editor( $languages, $store, $extractor ) )->register();
 			( new TranslatorWorkspace( $languages ) )->register();
+			( new \AIMultilingual\Admin\PluginActionLinks() )->register();
+			( new \AIMultilingual\Admin\PostListAiTranslateBulkAction() )->register();
+			( new \AIMultilingual\Admin\AdminNavigation() )->register();
 			( new GlossaryAdminPage( $languages ) )->register();
 			( new TermLocalizedSlugAdmin( $languages ) )->register();
 			( new \AIMultilingual\Admin\PromotionAdminPage( $languages ) )->register();

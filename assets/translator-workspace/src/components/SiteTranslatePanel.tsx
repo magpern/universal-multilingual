@@ -17,6 +17,8 @@ import {
 	runSiteTranslateBatch,
 } from '../api/site-translate-api';
 import LanguageSelect from './LanguageSelect';
+import { aiTranslateModeOptions } from '../utils/jobs';
+import type { AiTranslateMode } from '../types/jobs';
 import type { LanguageOption } from '../types/view-models';
 import type {
 	SiteTranslateObjectRow,
@@ -68,7 +70,25 @@ export default function SiteTranslatePanel( {
 	const [ loading, setLoading ] = useState( false );
 	const [ error, setError ] = useState( '' );
 	const [ message, setMessage ] = useState( '' );
-	const [ selected, setSelected ] = useState< Set< number > >( () => new Set() );
+	const [ selected, setSelected ] = useState< Set< number > >( () => {
+		try {
+			const raw = new URLSearchParams( window.location.search ).get(
+				'aiml_st_ids'
+			);
+			if ( ! raw ) {
+				return new Set();
+			}
+			return new Set(
+				raw
+					.split( ',' )
+					.map( ( value ) => Number.parseInt( value, 10 ) )
+					.filter( ( value ) => Number.isInteger( value ) && value > 0 )
+			);
+		} catch ( e ) {
+			return new Set();
+		}
+	} );
+	const [ mode, setMode ] = useState< AiTranslateMode >( 'missing' );
 	const [ batchId, setBatchId ] = useState( '' );
 	const [ clientToken, setClientToken ] = useState( () => newClientToken() );
 	const [ batchIncomplete, setBatchIncomplete ] = useState( false );
@@ -185,10 +205,16 @@ export default function SiteTranslatePanel( {
 
 		try {
 			await checkSiteTranslateAdmission( selectedIds );
+			const bulkJobType =
+				aiTranslateModeOptions().find(
+					( option ) => option.value === mode
+				)?.bulkJobType ?? 'bulk_translate';
 			const response = await createSiteTranslateJobs( {
 				postIds: selectedIds,
 				languageId,
 				clientToken,
+				jobType: bulkJobType,
+				autostart: true,
 				batchId: batchIncomplete ? batchId : undefined,
 			} );
 
@@ -376,11 +402,9 @@ export default function SiteTranslatePanel( {
 				/>
 			</div>
 
-			<div className="aiml-site-translate-actions">
-				<p className="description">
-					{ siteTranslateChunkMessage( selectedIds.length ) }
-				</p>
+			<div className="aiml-site-translate-actions aiml-ui-actionbar">
 				<Button
+					className="aiml-ui-actionbar__primary"
 					variant="primary"
 					disabled={
 						! canManageJobs || createBusy || 0 === selectedIds.length
@@ -389,11 +413,33 @@ export default function SiteTranslatePanel( {
 					onClick={ () => void handleCreateJobs() }
 				>
 					{ batchIncomplete
-						? __( 'Retry failed creation', 'ai-multilingual' )
-						: __( 'Create translation jobs', 'ai-multilingual' ) }
+						? __( 'Retry failed items', 'ai-multilingual' )
+						: __(
+								'Translate selected with AI',
+								'ai-multilingual'
+						  ) }
 				</Button>
+				<div className="aiml-ui-actionbar__mode">
+					<SelectControl
+						__nextHasNoMarginBottom
+						label={ __( 'Mode', 'ai-multilingual' ) }
+						hideLabelFromVision
+						value={ mode }
+						disabled={ createBusy }
+						onChange={ ( value ) =>
+							setMode( value as AiTranslateMode )
+						}
+						options={ aiTranslateModeOptions().map( ( option ) => ( {
+							value: option.value,
+							label: option.label,
+						} ) ) }
+					/>
+				</div>
+				<p className="aiml-ui-actionbar__hint">
+					{ siteTranslateChunkMessage( selectedIds.length ) }
+				</p>
 				<Button
-					variant="secondary"
+					variant="tertiary"
 					disabled={ ! canRunJobs || runBusy || ! batchId }
 					isBusy={ runBusy }
 					onClick={ () => void handleRunBatch() }

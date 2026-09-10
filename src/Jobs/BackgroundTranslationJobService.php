@@ -14,6 +14,7 @@ use AIMultilingual\Surface\SurfaceRegistry;
 use AIMultilingual\Translation\Extractor;
 use AIMultilingual\Translation\Store;
 use AIMultilingual\Workspace\SegmentAssembler;
+use AIMultilingual\Workspace\TranslatableSegmentEligibility;
 use WP_Error;
 use WP_Post;
 
@@ -185,6 +186,14 @@ final class BackgroundTranslationJobService {
 
 		if ( array() === $segments ) {
 			return new WP_Error( 'empty_workload', 'No segments to materialize for this job.' );
+		}
+
+		if ( count( $segments ) > JobBounds::MAX_ITEMS_PER_JOB ) {
+			return new WP_Error(
+				'workload_limit_exceeded',
+				'Job exceeds max items per job.',
+				array( 'status' => 422 )
+			);
 		}
 
 		if ( null !== $this->budget ) {
@@ -791,6 +800,7 @@ final class BackgroundTranslationJobService {
 			array(
 				JobTypes::TRANSLATE_MISSING,
 				JobTypes::RETRANSLATE_STALE,
+				JobTypes::RETRANSLATE_MACHINE,
 				JobTypes::BULK_TRANSLATE,
 			),
 			true
@@ -832,15 +842,15 @@ final class BackgroundTranslationJobService {
 				if ( ! is_array( $unit ) || ! is_string( $segment_key ) || '' === $segment_key ) {
 					continue;
 				}
-				$row    = $this->store->get( Store::SOURCE_TERM, $source_id, $language_id, $segment_key );
-				$status = null === $row ? Store::STATUS_MISSING : (string) ( $row->status ?? Store::STATUS_MISSING );
-				$text   = null === $row ? '' : trim( (string) ( $row->translated_text ?? '' ) );
-				$stale  = null !== $row && ! empty( $row->is_stale );
+				$row        = $this->store->get( Store::SOURCE_TERM, $source_id, $language_id, $segment_key );
+				$projection = array(
+					'status'          => null === $row ? Store::STATUS_MISSING : (string) ( $row->status ?? Store::STATUS_MISSING ),
+					'translated_text' => null === $row ? '' : (string) ( $row->translated_text ?? '' ),
+					'is_stale'        => null !== $row && ! empty( $row->is_stale ),
+					'review_status'   => null === $row ? Store::REVIEW_NOT_SUBMITTED : (string) ( $row->review_status ?? Store::REVIEW_NOT_SUBMITTED ),
+				);
 
-				if ( $this->job_type_resolves_missing( $job_type ) && ( Store::STATUS_MISSING === $status || '' === $text ) ) {
-					$keys[] = $segment_key;
-				}
-				if ( JobTypes::RETRANSLATE_STALE === $job_type && $stale ) {
+				if ( TranslatableSegmentEligibility::is_ai_writable( $projection, $this->job_type_mode( $job_type ) ) ) {
 					$keys[] = $segment_key;
 				}
 			}
@@ -872,12 +882,7 @@ final class BackgroundTranslationJobService {
 				continue;
 			}
 
-			if ( $this->job_type_resolves_missing( $job_type ) && $this->is_missing_segment( $segment ) ) {
-				$keys[] = $segment_key;
-				continue;
-			}
-
-			if ( JobTypes::RETRANSLATE_STALE === $job_type && $this->is_stale_segment( $segment ) ) {
+			if ( TranslatableSegmentEligibility::is_ai_writable( $segment, $this->job_type_mode( $job_type ) ) ) {
 				$keys[] = $segment_key;
 			}
 		}
@@ -886,42 +891,30 @@ final class BackgroundTranslationJobService {
 	}
 
 	/**
-	 * Whether create-time empty segment_keys auto-resolve uses missing-segment eligibility.
+	 * Map a job type to its shared AI-write eligibility mode for create-time
+	 * segment resolution (AIT1 / ADR-0031).
 	 *
-	 * Bulk_translate shares missing-only semantics with translate_missing (P2 A1).
+	 * `translate_missing` and `bulk_translate` share missing-only semantics
+	 * (P2 A1). `retranslate_stale` resolves stale machine translations.
+	 * `retranslate_machine` resolves every machine translation regardless of
+	 * stale state. All three exclude manual / reviewed / in-review segments via
+	 * TranslatableSegmentEligibility.
 	 *
 	 * @param string $job_type Job type code.
 	 */
-	private function job_type_resolves_missing( string $job_type ): bool {
-		return in_array(
-			$job_type,
-			array(
-				JobTypes::TRANSLATE_MISSING,
-				JobTypes::BULK_TRANSLATE,
-			),
-			true
-		);
-	}
+	private function job_type_mode( string $job_type ): string {
+		switch ( $job_type ) {
+			case JobTypes::RETRANSLATE_STALE:
+				return TranslatableSegmentEligibility::MODE_STALE;
 
-	/**
-	 * Whether a merged segment DTO is eligible for translate_missing.
-	 *
-	 * @param array<string, mixed> $segment Assembled segment.
-	 */
-	private function is_missing_segment( array $segment ): bool {
-		$status = (string) ( $segment['status'] ?? Store::STATUS_MISSING );
-		$text   = trim( (string) ( $segment['translated_text'] ?? '' ) );
+			case JobTypes::RETRANSLATE_MACHINE:
+				return TranslatableSegmentEligibility::MODE_MACHINE;
 
-		return Store::STATUS_MISSING === $status || '' === $text;
-	}
-
-	/**
-	 * Whether a merged segment DTO is eligible for retranslate_stale.
-	 *
-	 * @param array<string, mixed> $segment Assembled segment.
-	 */
-	private function is_stale_segment( array $segment ): bool {
-		return ! empty( $segment['is_stale'] );
+			case JobTypes::TRANSLATE_MISSING:
+			case JobTypes::BULK_TRANSLATE:
+			default:
+				return TranslatableSegmentEligibility::MODE_MISSING;
+		}
 	}
 
 	/**
@@ -994,11 +987,27 @@ final class BackgroundTranslationJobService {
 	 * @return array<string, mixed>
 	 */
 	private function args_from_job( object $job, array $args ): array {
-		$items = $this->items->list_by_job( (int) $job->job_id );
-		$keys  = array_map(
-			static fn( object $item ): string => (string) $item->segment_key,
-			$items
+		// Compare on the caller's inputs, not the materialised output: when the
+		// request did not pin explicit segment_keys (translate_missing /
+		// retranslate_stale / retranslate_machine / bulk_translate), two
+		// submissions with the same object+language+token are the same request
+		// even though resolution produced a concrete key list (AIT1 / ADR-0031
+		// automatic idempotency).
+		$incoming_keys = array_values(
+			array_filter(
+				array_map( 'strval', (array) ( $args['segment_keys'] ?? array() ) ),
+				static fn( string $key ): bool => '' !== $key
+			)
 		);
+
+		if ( array() === $incoming_keys ) {
+			$keys = array();
+		} else {
+			$keys = array_map(
+				static fn( object $item ): string => (string) $item->segment_key,
+				$this->items->list_by_job( (int) $job->job_id )
+			);
+		}
 
 		return array(
 			'job_type'       => (string) $job->job_type,

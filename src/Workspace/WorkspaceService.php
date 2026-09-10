@@ -261,7 +261,7 @@ final class WorkspaceService {
 		$this->term_adoption         = $term_adoption;
 		$this->slug_candidates       = $slug_candidates;
 		$this->route_publication     = $route_publication;
-		$this->batch                 = new BatchOperationCoordinator( $this, $translation );
+		$this->batch                 = new BatchOperationCoordinator( $this, $translation, $assembler );
 		$this->review_batch          = new ReviewBatchCoordinator( $this );
 		$this->operations_bulk       = new OperationsBulkCoordinator( $this, $store, $publication, null, $surfaces );
 	}

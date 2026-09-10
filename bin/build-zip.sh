@@ -35,6 +35,7 @@ cp -R "$ROOT/vendor" "$BUILD/vendor"
 # sources, Jest tests, package manifests, and node_modules are development-only.
 mkdir -p "$BUILD/assets"
 [ -f "$ROOT/assets/block-editor.js" ] && cp "$ROOT/assets/block-editor.js" "$BUILD/assets/"
+[ -d "$ROOT/assets/admin-ui" ] && cp -R "$ROOT/assets/admin-ui" "$BUILD/assets/admin-ui"
 [ -d "$ROOT/assets/glossary-admin" ] && cp -R "$ROOT/assets/glossary-admin" "$BUILD/assets/glossary-admin"
 [ -d "$ROOT/assets/languages-admin" ] && cp -R "$ROOT/assets/languages-admin" "$BUILD/assets/languages-admin"
 [ -d "$ROOT/assets/term-slug-admin" ] && cp -R "$ROOT/assets/term-slug-admin" "$BUILD/assets/term-slug-admin"

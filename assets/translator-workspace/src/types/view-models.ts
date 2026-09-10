@@ -160,6 +160,10 @@ export interface TranslatorWorkspaceConfig {
 	canManageJobs: boolean;
 	canRunJobs: boolean;
 	canCancelJobs: boolean;
+	/** Whether AI translation is configured (ADR-0031). */
+	aiConfigured?: boolean;
+	/** Settings screen URL for admins when AI is not configured. */
+	aiSettingsUrl?: string;
 }
 
 export interface AllowedActionDescriptor {

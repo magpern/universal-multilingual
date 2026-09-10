@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.15.2
+Stable tag: 1.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Multilingual layer for WordPress: canonical content with segment translations ap
 
 == Description ==
 
-Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.15.0 surfaces AI translation as one obvious action: a "Translate with AI" control on the Translator Workspace and a "Translate selected with AI" bulk action, both driven by the existing background Jobs pipeline, with manual, reviewed and in-review translations never overwritten. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
+Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.16.0 makes the localized URL feel like part of translation (it is proposed automatically, the technical route controls move under Advanced), adds a "Submit selected for review" bulk action, and translates WooCommerce product short descriptions on the storefront. Version 1.15.0 surfaces AI translation as one obvious action: a "Translate with AI" control on the Translator Workspace and a "Translate selected with AI" bulk action, both driven by the existing background Jobs pipeline, with manual, reviewed and in-review translations never overwritten. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
 
 == Installation ==
 
@@ -31,6 +31,15 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.16.0 =
+* Localized URL as part of translation: the localized slug is proposed automatically after "Translate with AI" and on Workspace load (following the translated title), shown as a plain "URL for <language>" with an Edit action and a clear state ("Ready when Swedish is published." / "Ready to publish." / "Published."). A manually edited slug is never overwritten. The technical lifecycle controls (Regenerate / Clear / Publish route / Refresh, origin and route detail) move under "Advanced URL controls". New POST aiml/v1/workspace/<id>/slug/ensure endpoint.
+* The localized URL slug (post_name) is no longer shown as an editable translation segment in the Workspace — every AI and bulk path already excludes it and it has its own dedicated lifecycle. This also removes the misleading "empty translation" warnings on it.
+* New bulk "Submit selected for review" action in the Translator Workspace (the batch endpoint already supported it).
+* "Accept TM exact" is now labelled "Apply exact memory matches" with an explanatory tooltip.
+* WooCommerce product short descriptions are now translated on the storefront. WooCommerce renders them through its own woocommerce_short_description filter (never get_the_excerpt), so the overlay missed them; it is now applied there at priority 1, before WooCommerce's own formatting filters.
+* Preview note: the Workspace explains that Preview opens the translated page for signed-in editors only when the target language is not published yet.
+* No database migration. Schema stays at version 10; settings shape stays at 3.
 
 = 1.15.2 =
 * Fix: the Translator Workspace no longer shows "Quality checks" warnings (empty_translation, number, HTML-tag) on segments that have not been translated yet. An absent translation has no translation quality to report and the Status column already shows "Missing"; the noise was especially visible on fields the AI flow does not translate, such as the URL slug (post_name). Quality checks still run in full on the save and review paths.

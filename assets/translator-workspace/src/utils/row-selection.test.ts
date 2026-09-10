@@ -6,6 +6,7 @@ import {
 	selectedDirtyRows,
 	selectedEditableRows,
 	selectedPendingReviewRows,
+	selectedSubmittableRows,
 	toggleSelection,
 } from './row-selection';
 import type { SegmentRow } from '../types/segment-row';
@@ -145,5 +146,57 @@ describe( 'row-selection', () => {
 				new Set( [ 'b:pending:content', 'b:approved:content' ] )
 			)
 		).toHaveLength( 1 );
+	} );
+
+	it( 'selectedSubmittableRows picks clean, editable, not-yet-submitted rows with text', () => {
+		const rows = [
+			row( {
+				segmentKey: 'ok',
+				draftText: 'Hej',
+				server: {
+					segment_key: 'ok',
+					translated_text: 'Hej',
+					status: 'machine_translated',
+					review_status: 'not_submitted',
+				},
+			} ),
+			row( {
+				segmentKey: 'dirty',
+				draftText: 'edited',
+				server: {
+					segment_key: 'dirty',
+					translated_text: 'Hej',
+					status: 'machine_translated',
+					review_status: 'not_submitted',
+				},
+			} ),
+			row( {
+				segmentKey: 'pending',
+				draftText: 'Hej',
+				server: {
+					segment_key: 'pending',
+					translated_text: 'Hej',
+					status: 'machine_translated',
+					review_status: 'pending',
+				},
+			} ),
+			row( {
+				segmentKey: 'empty',
+				draftText: '',
+				server: {
+					segment_key: 'empty',
+					translated_text: '',
+					status: 'missing',
+					review_status: 'not_submitted',
+				},
+			} ),
+		];
+
+		expect(
+			selectedSubmittableRows(
+				rows,
+				new Set( [ 'ok', 'dirty', 'pending', 'empty' ] )
+			).map( ( r ) => r.segmentKey )
+		).toEqual( [ 'ok' ] );
 	} );
 } );

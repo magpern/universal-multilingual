@@ -1,4 +1,5 @@
 import type { SegmentRow } from '../types/segment-row';
+import { canSubmitForReview } from './review-status';
 
 export function isRowSelectable( row: SegmentRow ): boolean {
 	return row.server.can_edit;
@@ -103,5 +104,22 @@ export function selectedPendingReviewRows(
 ): SegmentRow[] {
 	return rows.filter(
 		( row ) => selected.has( row.segmentKey ) && isRowPendingReview( row )
+	);
+}
+
+/**
+ * Selected rows a translator may submit for review: `not_submitted` or
+ * `rejected`, editable, with eligible translated text (ADR-0015 §4.1). A
+ * clean draft is required — an unsaved edit is submitted through Save first.
+ */
+export function selectedSubmittableRows(
+	rows: SegmentRow[],
+	selected: Set< string >
+): SegmentRow[] {
+	return rows.filter(
+		( row ) =>
+			selected.has( row.segmentKey ) &&
+			row.draftText === row.server.translated_text &&
+			canSubmitForReview( row.server )
 	);
 }

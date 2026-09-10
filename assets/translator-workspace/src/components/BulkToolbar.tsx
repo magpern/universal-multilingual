@@ -12,6 +12,8 @@ interface BulkToolbarProps {
 	onClearSelection: () => void;
 	canReview?: boolean;
 	reviewSelectedCount?: number;
+	submitSelectedCount?: number;
+	onSubmitSelected?: () => void;
 	onApproveSelected?: () => void;
 	onRejectSelected?: () => void;
 }
@@ -27,6 +29,8 @@ export default function BulkToolbar( {
 	onClearSelection,
 	canReview = false,
 	reviewSelectedCount = 0,
+	submitSelectedCount = 0,
+	onSubmitSelected,
 	onApproveSelected,
 	onRejectSelected,
 }: BulkToolbarProps ) {
@@ -78,8 +82,13 @@ export default function BulkToolbar( {
 						variant="secondary"
 						onClick={ onAcceptTmExact }
 						disabled={ busy }
+						aria-label={ __(
+							'Apply the exact 100% translation-memory match to each selected segment that has one',
+							'ai-multilingual'
+						) }
+						showTooltip
 					>
-						{ __( 'Accept TM exact', 'ai-multilingual' ) }
+						{ __( 'Apply exact memory matches', 'ai-multilingual' ) }
 					</Button>
 				) }
 				{ onRunQa && (
@@ -89,6 +98,23 @@ export default function BulkToolbar( {
 						disabled={ busy }
 					>
 						{ __( 'Run QA', 'ai-multilingual' ) }
+					</Button>
+				) }
+				{ canReview && onSubmitSelected && (
+					<Button
+						variant="secondary"
+						onClick={ onSubmitSelected }
+						disabled={ busy || submitSelectedCount === 0 }
+						aria-label={ __(
+							'Submit selected translated segments for review',
+							'ai-multilingual'
+						) }
+					>
+						{ sprintf(
+							/* translators: %d: submittable selected count */
+							__( 'Submit selected for review (%d)', 'ai-multilingual' ),
+							submitSelectedCount
+						) }
 					</Button>
 				) }
 				{ canReview && onApproveSelected && (

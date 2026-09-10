@@ -466,6 +466,27 @@ final class WorkspaceController {
 
 		register_rest_route(
 			self::REST_NAMESPACE,
+			'/' . self::REST_BASE . '/(?P<post_id>\d+)/slug/ensure',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'ensure_slug_candidate' ),
+				'permission_callback' => array( $this, 'can_edit_post' ),
+				'args'                => array(
+					'post_id'  => array(
+						'type'              => 'integer',
+						'required'          => true,
+						'sanitize_callback' => 'absint',
+					),
+					'language' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::REST_NAMESPACE,
 			'/' . self::REST_BASE . '/(?P<post_id>\d+)/slug',
 			array(
 				array(
@@ -1254,6 +1275,26 @@ final class WorkspaceController {
 			return $language;
 		}
 		$result = $this->workspace->generate_slug_candidate( $post, (int) $language->language_id );
+
+		return $result instanceof WP_Error ? $result : $this->respond( $result );
+	}
+
+	/**
+	 * Ensures a localized URL slug follows the translation (auto-generate).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function ensure_slug_candidate( WP_REST_Request $request ) {
+		$post = $this->resolve_post( $request );
+		if ( $post instanceof WP_Error ) {
+			return $post;
+		}
+		$language = $this->resolve_language_param( $request );
+		if ( $language instanceof WP_Error ) {
+			return $language;
+		}
+		$result = $this->workspace->ensure_slug_candidate( $post, (int) $language->language_id );
 
 		return $result instanceof WP_Error ? $result : $this->respond( $result );
 	}

@@ -687,6 +687,7 @@ final class RoutePublicationService {
 			'slug_candidate_publish_status'    => $pub,
 			'active_route_slug'                => $route_slug,
 			'active_route_status'              => null !== $route ? (string) ( $route->route_status ?? '' ) : '',
+			'localized_path'                   => null !== $route ? (string) ( $route->localized_path ?? '' ) : '',
 			'route_prepared'                   => $active,
 			'route_sync_state'                 => $sync,
 			'collision_adjusted'               => 'synchronized' === $sync && $cand_text !== $route_slug && '' !== $route_slug,

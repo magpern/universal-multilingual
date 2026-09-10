@@ -1653,6 +1653,218 @@ final class WorkspaceService {
 	}
 
 	/**
+	 * MLW1a (ADR-0034 C1) — Review Queue read model paginated by OBJECT.
+	 *
+	 * Uses {@see Store::query_review_object_ids()} (grouped, object-level
+	 * pagination) + {@see Store::review_rows_for_objects()} (all rows for the
+	 * paged objects across every selected language, no row-level pagination),
+	 * so one object's languages are never split across pages. Each object
+	 * carries one entry per language that has review rows, and the full
+	 * {@see ObjectLanguagesSummary} (M-wide, so a forgotten language shows).
+	 *
+	 * @param array<string, mixed> $args Query args: language_ids (int[]),
+	 *                                   review_status ('all' or a
+	 *                                   Store::review_statuses() value), page,
+	 *                                   per_page.
+	 * @return array<string, mixed>
+	 */
+	public function review_queue_by_object( array $args ) {
+		$language_ids  = array_values(
+			array_filter( array_map( 'intval', (array) ( $args['language_ids'] ?? array() ) ) )
+		);
+		$review_status = (string) ( $args['review_status'] ?? Store::REVIEW_PENDING );
+		$page          = max( 1, (int) ( $args['page'] ?? 1 ) );
+		$per_page      = (int) ( $args['per_page'] ?? 20 );
+
+		$paged = $this->store->query_review_object_ids(
+			array(
+				'source_type'   => Store::SOURCE_POST,
+				'review_status' => $review_status,
+				'language_ids'  => $language_ids,
+				'page'          => $page,
+				'per_page'      => $per_page,
+			)
+		);
+
+		$rows = $this->store->review_rows_for_objects(
+			$paged['object_ids'],
+			$language_ids,
+			$review_status
+		);
+
+		// source_id => language_id => rows[]  (rows already deterministically ordered).
+		$by_object = array();
+		foreach ( $rows as $row ) {
+			$by_object[ (int) $row->source_id ][ (int) $row->language_id ][] = $row;
+		}
+
+		$resolver = new FieldLabelResolver();
+		$objects  = array();
+
+		foreach ( $paged['object_ids'] as $object_id ) {
+			$post = get_post( (int) $object_id );
+			if ( ! $post instanceof WP_Post ) {
+				continue;
+			}
+			$post_type = (string) $post->post_type;
+			$label_map = $this->assembled_label_map_by_language( $post, array_keys( $by_object[ $object_id ] ?? array() ) );
+
+			$languages = array();
+			foreach ( (array) ( $by_object[ $object_id ] ?? array() ) as $language_id => $language_rows ) {
+				$language = $this->languages->find( (int) $language_id );
+				if ( null === $language ) {
+					continue;
+				}
+
+				$items = array();
+				foreach ( $language_rows as $row ) {
+					$key              = (string) ( $row->segment_key ?? '' );
+					$row->field_label = $resolver->label(
+						(string) ( $row->field_key ?? '' ),
+						$key,
+						$post_type,
+						(string) ( $label_map[ (int) $language_id ][ $key ] ?? '' )
+					);
+					$row->post_title  = (string) $post->post_title;
+					$row->post_type   = $post_type;
+					$items[]          = $row;
+				}
+
+				$languages[] = array(
+					'language_id'   => (int) $language_id,
+					'language_code' => (string) ( $language->code ?? '' ),
+					'language_name' => (string) ( $language->name ?? '' ),
+					'summary'       => $this->object_language_status( $post, $language )->to_array(),
+					'items'         => $items,
+				);
+			}
+
+			$objects[] = array(
+				'post_id'                  => (int) $post->ID,
+				'post_title'               => (string) $post->post_title,
+				'post_type'                => $post_type,
+				'object_noun'              => $resolver->object_noun( $post_type ),
+				'post_status'              => (string) $post->post_status,
+				'edit_link'                => (string) get_edit_post_link( (int) $post->ID, 'raw' ),
+				'languages'                => $languages,
+				'object_languages_summary' => ObjectLanguagesSummary::from_statuses(
+					array_map(
+						fn( object $language ): ObjectLanguageStatus => $this->object_language_status( $post, $language ),
+						$this->eligible_target_languages()
+					)
+				)->to_array(),
+			);
+		}
+
+		return array(
+			'objects'  => $objects,
+			'total'    => (int) $paged['total'],
+			'page'     => (int) $paged['page'],
+			'per_page' => (int) $paged['per_page'],
+		);
+	}
+
+	/**
+	 * MLW1a (ADR-0034 C4/D6) — "Approve all ready languages" for one object.
+	 *
+	 * Calls the v1.17.0 {@see approve_object()} once per language that is
+	 * currently approvable (pending rows, no missing/stale/rejected/QA-error).
+	 * Each approve_object() resolves the FULL pending set and approves it in
+	 * bounded ReviewBatchCoordinator::BATCH_LIMIT chunks, so an object with
+	 * >50 pending segments in each of several languages has ALL of them
+	 * approved — no first-50 truncation. `needs_attention` languages are
+	 * reported in `skipped`, never silently approved.
+	 *
+	 * @param WP_Post        $post         Canonical post.
+	 * @param array<int,int> $language_ids Target language ids (empty = every eligible target).
+	 * @param int            $user_id      Acting reviewer id.
+	 * @return array<string, mixed>|WP_Error
+	 */
+	public function approve_object_languages( WP_Post $post, array $language_ids, int $user_id ) {
+		$this->assert_supported_post( $post );
+
+		$targets = $this->eligible_target_languages();
+		if ( array() !== $language_ids ) {
+			$wanted  = array_flip( array_map( 'intval', $language_ids ) );
+			$targets = array_values(
+				array_filter(
+					$targets,
+					static fn( object $language ): bool => isset( $wanted[ (int) $language->language_id ] )
+				)
+			);
+		}
+
+		$per_language = array();
+		$skipped      = array();
+
+		foreach ( $targets as $language ) {
+			$language_id = (int) $language->language_id;
+			$status      = $this->object_language_status( $post, $language );
+
+			if ( ! $status->is_approvable() ) {
+				$skipped[] = array(
+					'language_id'   => $language_id,
+					'language_code' => (string) ( $language->code ?? '' ),
+					'state'         => $status->state(),
+					'pending'       => $status->pending,
+				);
+				continue;
+			}
+
+			$result = $this->approve_object( $post, $language_id, $user_id );
+			if ( $result instanceof WP_Error ) {
+				return $result;
+			}
+
+			$per_language[] = array(
+				'language_id'    => $language_id,
+				'language_code'  => (string) ( $language->code ?? '' ),
+				'approved_count' => (int) $result['approved_count'],
+				'skipped'        => $result['skipped'],
+				'summary'        => $result['summary'],
+			);
+		}
+
+		$statuses           = array_map(
+			fn( object $language ): ObjectLanguageStatus => $this->object_language_status( $post, $language ),
+			$this->eligible_target_languages()
+		);
+		$not_fully_reviewed = false;
+		foreach ( $this->eligible_target_languages() as $language ) {
+			if ( ! $this->object_review_summary( $post, (int) $language->language_id )->is_fully_reviewed() ) {
+				$not_fully_reviewed = true;
+				break;
+			}
+		}
+
+		return array(
+			'post_id'            => (int) $post->ID,
+			'post_title'         => (string) $post->post_title,
+			'post_type'          => (string) $post->post_type,
+			'approved_languages' => $per_language,
+			'skipped_languages'  => $skipped,
+			'summary'            => ObjectLanguagesSummary::from_statuses( $statuses )->to_array(),
+			'not_fully_reviewed' => $not_fully_reviewed,
+		);
+	}
+
+	/**
+	 * Per-language integration-provided field label maps.
+	 *
+	 * @param WP_Post           $post         Canonical post.
+	 * @param array<int, mixed> $language_ids Language ids to build maps for.
+	 * @return array<int, array<string, string>>
+	 */
+	private function assembled_label_map_by_language( WP_Post $post, array $language_ids ): array {
+		$maps = array();
+		foreach ( $language_ids as $language_id ) {
+			$maps[ (int) $language_id ] = $this->assembled_label_map( $post, (int) $language_id );
+		}
+
+		return $maps;
+	}
+
+	/**
 	 * Composes the completeness-aware summary for one object + language.
 	 *
 	 * @param WP_Post $post        Canonical post.

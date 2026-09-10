@@ -407,7 +407,7 @@ final class WorkspaceController {
 					),
 					'language' => array(
 						'type'     => 'string',
-						'required' => true,
+						'required' => false,
 					),
 				),
 			)
@@ -1709,6 +1709,10 @@ final class WorkspaceController {
 			$args['review_status'] = sanitize_key( (string) $review_status );
 		}
 
+		// MLW1a (ADR-0034 C1): optional multi-language filter for the
+		// object-first read model.
+		$language_ids = $this->resolve_language_ids( $request->get_param( 'languages' ) );
+
 		$result = $this->workspace->review_queue_grouped( $args );
 		if ( $result instanceof WP_Error ) {
 			return $result;
@@ -1720,15 +1724,61 @@ final class WorkspaceController {
 			$objects[]      = $group;
 		}
 
-		return $this->respond(
+		$grouped       = $this->workspace->review_queue_by_object(
 			array(
-				'items'    => $this->review_queue_serializer->many_to_arrays( $result['items'] ),
-				'objects'  => $objects,
-				'total'    => $result['total'],
-				'page'     => $result['page'],
-				'per_page' => $result['per_page'],
+				'language_ids'  => $language_ids,
+				'review_status' => $args['review_status'] ?? 'pending',
+				'page'          => $args['page'],
+				'per_page'      => $args['per_page'],
 			)
 		);
+		$object_groups = array();
+		foreach ( $grouped['objects'] as $object ) {
+			foreach ( $object['languages'] as $index => $language ) {
+				$object['languages'][ $index ]['items'] = $this->review_queue_serializer->many_to_arrays( $language['items'] );
+			}
+			$object_groups[] = $object;
+		}
+
+		return $this->respond(
+			array(
+				'items'         => $this->review_queue_serializer->many_to_arrays( $result['items'] ),
+				'objects'       => $objects,
+				'object_groups' => $object_groups,
+				'object_total'  => (int) $grouped['total'],
+				'total'         => $result['total'],
+				'page'          => $result['page'],
+				'per_page'      => $result['per_page'],
+			)
+		);
+	}
+
+	/**
+	 * Resolves a `languages` request param (array of codes and/or ids) to
+	 * language ids. Empty/absent yields an empty array (no filter).
+	 *
+	 * @param mixed $raw Raw request value.
+	 * @return array<int, int>
+	 */
+	private function resolve_language_ids( $raw ): array {
+		if ( null === $raw || '' === $raw ) {
+			return array();
+		}
+
+		$values = is_array( $raw ) ? $raw : preg_split( '/\s*,\s*/', (string) $raw, -1, PREG_SPLIT_NO_EMPTY );
+		$ids    = array();
+		foreach ( (array) $values as $value ) {
+			if ( is_numeric( $value ) ) {
+				$ids[ (int) $value ] = (int) $value;
+				continue;
+			}
+			$language = $this->workspace->resolve_language( sanitize_key( (string) $value ) );
+			if ( null !== $language ) {
+				$ids[ (int) $language->language_id ] = (int) $language->language_id;
+			}
+		}
+
+		return array_values( $ids );
 	}
 
 	/**
@@ -1741,6 +1791,20 @@ final class WorkspaceController {
 		$post = $this->resolve_post( $request );
 		if ( $post instanceof WP_Error ) {
 			return $post;
+		}
+
+		// MLW1a (ADR-0034 C4/D6): `languages[]` in the body switches to
+		// "Approve all ready languages" — bounded per-language approval that
+		// keeps the >50-pending-segment guarantee.
+		$languages = $this->body_params( $request )['languages'] ?? null;
+		if ( null !== $languages ) {
+			$result = $this->workspace->approve_object_languages(
+				$post,
+				$this->resolve_language_ids( $languages ),
+				(int) get_current_user_id()
+			);
+
+			return $result instanceof WP_Error ? $result : $this->respond( $result );
 		}
 
 		$language = $this->resolve_language_param( $request );

@@ -101,14 +101,31 @@ harness).
 DEV edge/host network condition, unrelated to AIT1; every occurrence passed on
 Playwright's automatic retry.
 
-### Existing browser suites
+### Existing acceptance suites re-run vs DEV
 
-`acceptance/languages-admin-browser`, `f10-browser`, `jobs`, `a3-elementor` were
-**not** re-run in this session: they run on the host (they shell out to
-`/opt/biopentra/scripts/dev-wp` and need a host `npx playwright install`), not in
-the Playwright container. Their `src/` contracts are covered by the full PHP
-integration suite (incl. `PluginGuardTest`, the Elementor `Tsc5*` tests, and
-`JobsRestTest`), which is green at head. Running them on the host is the one
+- **`acceptance/jobs/smoke-dev.php`** (WP-CLI): **34/35 PASS** on DEV with AIT1
+  deployed — `create` (all four job types incl. `retranslate_machine`),
+  `create_bulk`, `batch_status`, `retry-failed` 409, capability gating, table +
+  `review_status` column integrity, audit privacy. The 1 non-pass is
+  `schema_target_7` — a stale assertion in the smoke script (`7 === Migrator::TARGET`);
+  `Migrator::TARGET` has been **10 since before the AIT1 baseline `fad4f9da4`**
+  (`git show fad4f9da4:src/Database/Migrator.php` → `const TARGET = 10`). Not an
+  AIT1 regression.
+- **`acceptance/a3-elementor`** is a fixture seeder (`scripts/seed-a3-fixture.php`),
+  not a runnable test suite; the Elementor render/overlay contract it feeds is
+  covered by `ElementorAiTranslationRoundtripTest` (new) + the `Tsc5*` integration
+  tests (green).
+- **`acceptance/languages-admin-browser`** — Playwright, re-run vs DEV in the
+  Playwright Docker image with the docker socket mounted (a small `dev-wp` shim
+  replaces the compose wrapper). Result recorded on the next line once the run
+  completes. The Languages screen's only AIT1 change is a body `aiml-ui` class +
+  its stylesheet loaded as a dependency of the shared `aiml-admin-ui` handle;
+  scenario 16 of the new suite already confirmed `.aiml-ui` renders there on DEV.
+- **`acceptance/f10-browser`** — **not re-run**: needs the `F10_POST_ID` fixture
+  post and an f9 auth-cookie bootstrap, and its `bulk translate reports not
+  configured` test is stale against the current DEV (which has a provider key,
+  `is_ai_configured=true`). Its workspace behaviour is covered by the new
+  `acceptance/ai-translation-browser` suite + `JobsRestTest` / `WorkspaceServiceTest`. Running them on the host is the one
 outstanding acceptance step.
 
 ### Teardown

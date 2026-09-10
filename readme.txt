@@ -4,7 +4,7 @@ Tags: multilingual, translation, woocommerce, gutenberg, ai
 Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.16.1
+Stable tag: 1.17.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Multilingual layer for WordPress: canonical content with segment translations ap
 
 == Description ==
 
-Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.16.0 makes the localized URL feel like part of translation (it is proposed automatically, the technical route controls move under Advanced), adds a "Submit selected for review" bulk action, and translates WooCommerce product short descriptions on the storefront. Version 1.15.0 surfaces AI translation as one obvious action: a "Translate with AI" control on the Translator Workspace and a "Translate selected with AI" bulk action, both driven by the existing background Jobs pipeline, with manual, reviewed and in-review translations never overwritten. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
+Universal Multilingual stores one canonical object per content item and applies language overlays at render time. Version 1.17.0 makes the Review Queue object-level: pending translations are grouped by page/product and language with human field labels, and one "Approve page" action approves every eligible pending field at once while spelling out anything still missing. Version 1.16.0 makes the localized URL feel like part of translation (it is proposed automatically, the technical route controls move under Advanced), adds a "Submit selected for review" bulk action, and translates WooCommerce product short descriptions on the storefront. Version 1.15.0 surfaces AI translation as one obvious action: a "Translate with AI" control on the Translator Workspace and a "Translate selected with AI" bulk action, both driven by the existing background Jobs pipeline, with manual, reviewed and in-review translations never overwritten. Version 1.13.0 rebuilds "Add a language" around selection: the URL code, locale, name, native name and direction are derived server-side from a bundled offline locale registry. Version 1.12.0 adds logged-in Regional Preferences (preferred language) and an optional floating language selector (default off). Version 1.11.0 adds Site Translate (coverage-aware picker, chunked Jobs, Run batch now, Localized URL batch). Version 1.10.0 adds the DeepSeek AI provider and per-provider generation settings. Version 1.9.0 rebranded to Universal Multilingual.
 
 == Installation ==
 
@@ -31,6 +31,9 @@ GPL-2.0-or-later. Only the data is used; the plugin has no runtime dependency on
 GlotPress. See the file's header for the exact source revision and snapshot date.
 
 == Changelog ==
+
+= 1.17.0 =
+* Object-level Review Queue: pending translations are grouped by page/product and language, with human-readable field labels and a completeness summary. A new "Approve page" / "Approve product" action approves every eligible pending field for that object and language at once (processed in full, not just the first batch), reusing the existing review rules; QA-blocked or missing fields are reported, never silently approved, and the result spells out what is left ("27 approved · 2 need attention · 3 untranslated — page not fully reviewed"). Per-field review still works. New POST aiml/v1/workspace/<id>/review/approve-object endpoint. No schema change.
 
 = 1.16.1 =
 * New "Delete translation" action in the Translator Workspace: removes every translated segment for the current page in the current language (including manually edited/reviewed text and the localized URL) plus its localized route, so you can start over. Confirmation required; the canonical page is never touched. New DELETE aiml/v1/workspace/<id>/translation endpoint.

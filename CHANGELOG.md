@@ -5,6 +5,34 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-09-10
+
+### Added
+
+- **Object-level Review Queue.** The Review Queue is now grouped by content
+  object + language instead of a flat list of segments. Each group card shows
+  the object title and type, the target language, human-readable field labels
+  (Title, Short description, Attribute: Strength, ...), and a
+  completeness-aware summary. A new **Approve page / Approve product** action
+  approves every currently eligible pending segment for that object + language
+  in one step — reusing `ReviewBatchCoordinator` (safe-subset, non-atomic),
+  processing the whole pending set in bounded chunks (never capped at one
+  batch), and returning an explicit result such as *"27 approved · 2 need
+  attention · 3 untranslated — page not fully reviewed"* so a complex page is
+  never mistaken for fully reviewed. QA-blocked and conflicted segments are
+  reported, not silently approved. Per-segment and per-selection review still
+  work. New `POST aiml/v1/workspace/<id>/review/approve-object`.
+- Field labels are produced server-side (`FieldLabelResolver`) and sent in the
+  review-queue payload; the raw technical segment key stays available under a
+  "Technical details" disclosure on each row.
+
+### Notes
+
+- No schema change. `Migrator::TARGET` 10, `Settings::SCHEMA_VERSION` 3.
+- Completeness is composed from `Store::review_status_counts()` +
+  `TranslationStatusCalculator` — no new coverage model, no second review
+  engine.
+
 ## [1.16.1] - 2026-09-10
 
 ### Added

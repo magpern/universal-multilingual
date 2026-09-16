@@ -11,6 +11,8 @@ namespace AIMultilingual\Tests\Integration;
 
 use AIMultilingual\Block\Contract;
 use AIMultilingual\Block\SegmentKey;
+use AIMultilingual\Routing\SlugRouteRepository;
+use AIMultilingual\Translation\Extractor;
 use AIMultilingual\Translation\Store;
 use WP_REST_Request;
 
@@ -119,6 +121,70 @@ final class ObjectLevelReviewTest extends AimlTestCase {
 			$row = $this->store->get( Store::SOURCE_POST, (int) $page->ID, $lid, $field );
 			$this->assertSame( Store::REVIEW_APPROVED, $row->review_status );
 		}
+	}
+
+	/**
+	 * Approving a page's translation also publishes its prepared localized
+	 * URL, so a bulk translate -> approve run never leaves a manual
+	 * "Publish URL" click behind for every page x language.
+	 */
+	public function test_approve_object_auto_publishes_a_ready_route(): void {
+		$language = $this->add_language();
+		$lid      = (int) $language->language_id;
+		$page     = $this->create_page( 'How to Pay', '<p>English body.</p>' );
+
+		$this->seed_pending( (int) $page->ID, $lid, 'post_title', 'How to Pay', 'Hur man betalar' );
+
+		// Slug candidate present but never separately "reviewed" — matches the
+		// real localized-URL lifecycle (its own panel, not the segment queue).
+		$this->store->save_slug_candidate(
+			array(
+				'source_id'       => (int) $page->ID,
+				'language_id'     => $lid,
+				'field_key'       => Extractor::FIELD_SLUG,
+				'segment_key'     => Extractor::FIELD_SLUG,
+				'source_text'     => 'how-to-pay',
+				'translated_text' => 'hur-man-betalar',
+				'status'          => Store::STATUS_MANUALLY_EDITED,
+				'slug_origin'     => 'manual',
+			)
+		);
+
+		wp_set_current_user( $this->create_reviewer() );
+		$response = rest_do_request( $this->approve_object_request( (int) $page->ID ) );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertTrue( $data['route_publish']['attempted'] );
+		$this->assertTrue( $data['route_publish']['published'] );
+		$this->assertSame( '', $data['route_publish']['reason'] );
+
+		$route = ( new SlugRouteRepository() )->find_by_object( Store::SOURCE_POST, (int) $page->ID, $lid );
+		$this->assertNotNull( $route );
+		$this->assertSame( 'active', $route->route_status );
+		$this->assertSame( 'hur-man-betalar', $route->localized_slug );
+	}
+
+	/**
+	 * A page/language with no slug candidate is approved normally; the
+	 * auto-publish attempt is reported as not-published, never as a failure.
+	 */
+	public function test_approve_object_reports_route_publish_without_a_candidate(): void {
+		$language = $this->add_language();
+		$lid      = (int) $language->language_id;
+		$page     = $this->create_page( 'Doc', '<p>English body.</p>' );
+
+		$this->seed_pending( (int) $page->ID, $lid, 'post_title', 'Doc', 'Dokument' );
+
+		wp_set_current_user( $this->create_reviewer() );
+		$response = rest_do_request( $this->approve_object_request( (int) $page->ID ) );
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertSame( 1, $data['approved_count'] );
+		$this->assertTrue( $data['route_publish']['attempted'] );
+		$this->assertFalse( $data['route_publish']['published'] );
+		$this->assertNotSame( '', $data['route_publish']['reason'] );
 	}
 
 	public function test_approve_object_does_not_touch_another_object_or_language(): void {

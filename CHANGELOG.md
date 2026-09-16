@@ -5,6 +5,22 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.0] - 2026-09-16
+
+### Added
+
+- `WorkspaceService::approve_object()` (and therefore `approve_object_languages()`,
+  "Approve all ready languages") now also attempts to publish that
+  page/language's prepared localized-URL route in the same action, via the
+  existing `RoutePublicationService`. Best-effort: reported in a new
+  `route_publish: {attempted, published, reason}` field on the response,
+  never fails the content approval itself. A page with no slug candidate yet,
+  an unpublished language, or a URL collision is simply reported as not
+  published — the operator can still publish it manually from the Workspace's
+  localized-URL panel afterward. Removes the separate manual "Publish URL"
+  click a bulk translate-then-approve run across many pages × languages
+  otherwise required for every single one.
+
 ## [1.19.0] - 2026-09-16
 
 ### Fixed

@@ -1638,6 +1638,8 @@ final class WorkspaceService {
 		}
 		unset( $entry );
 
+		$route_publish = $this->maybe_auto_publish_route( $post, $language_id, $user_id );
+
 		$summary = $this->object_review_summary( $post, $language_id );
 
 		return array(
@@ -1649,6 +1651,45 @@ final class WorkspaceService {
 			'approved'       => $approved,
 			'skipped'        => array_values( $skipped ),
 			'summary'        => $summary->to_array(),
+			'route_publish'  => $route_publish,
+		);
+	}
+
+	/**
+	 * Best-effort route publication after a page/language is approved
+	 * (ADR-0034 follow-up: approving a page's translation also takes its
+	 * localized URL live, so a bulk "translate → approve" run across many
+	 * pages and languages never leaves a manual per-page "Publish URL" click
+	 * behind). Never fails the approval itself — a missing slug candidate,
+	 * an unpublished language, or a collision is reported, not thrown.
+	 *
+	 * @param WP_Post $post        Source post.
+	 * @param int     $language_id Language id.
+	 * @param int     $user_id     Acting user.
+	 * @return array{attempted: bool, published: bool, reason: string}
+	 */
+	private function maybe_auto_publish_route( WP_Post $post, int $language_id, int $user_id ): array {
+		if ( null === $this->route_publication ) {
+			return array(
+				'attempted' => false,
+				'published' => false,
+				'reason'    => '',
+			);
+		}
+
+		$result = $this->route_publication->publish_route( $post, $language_id, $user_id );
+		if ( $result instanceof WP_Error ) {
+			return array(
+				'attempted' => true,
+				'published' => false,
+				'reason'    => $result->get_error_message(),
+			);
+		}
+
+		return array(
+			'attempted' => true,
+			'published' => true,
+			'reason'    => '',
 		);
 	}
 
@@ -1840,6 +1881,7 @@ final class WorkspaceService {
 				'approved_count' => (int) $result['approved_count'],
 				'skipped'        => $result['skipped'],
 				'summary'        => $result['summary'],
+				'route_publish'  => $result['route_publish'],
 			);
 		}
 

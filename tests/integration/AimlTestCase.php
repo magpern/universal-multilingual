@@ -26,6 +26,7 @@ use AIMultilingual\Settings;
 use AIMultilingual\Translation\Extractor;
 use AIMultilingual\Translation\Renderer;
 use AIMultilingual\Translation\Store;
+use AIMultilingual\User\PreferredLanguage;
 use WP_UnitTestCase;
 
 /**
@@ -211,7 +212,7 @@ abstract class AimlTestCase extends WP_UnitTestCase {
 	/**
 	 * Builds a production-shaped Router for integration tests.
 	 */
-	protected function make_router( ?Settings $settings = null ): Router {
+	protected function make_router( ?Settings $settings = null, ?PreferredLanguage $preferred_language = null ): Router {
 		$settings = $settings ?? new Settings();
 
 		$paths        = new PathCanonicalizer();
@@ -231,7 +232,8 @@ abstract class AimlTestCase extends WP_UnitTestCase {
 			$paths,
 			$routes,
 			$history,
-			$hierarchy
+			$hierarchy,
+			$preferred_language
 		);
 	}
 
@@ -243,10 +245,10 @@ abstract class AimlTestCase extends WP_UnitTestCase {
 	 *
 	 * @param string $uri Request URI including any language prefix.
 	 */
-	protected function route( string $uri, ?Settings $settings = null ): Router {
+	protected function route( string $uri, ?Settings $settings = null, ?PreferredLanguage $preferred_language = null ): Router {
 		$_SERVER['REQUEST_URI'] = $uri;
 
-		$router = $this->make_router( $settings );
+		$router = $this->make_router( $settings, $preferred_language );
 		$router->resolve();
 
 		return $router;

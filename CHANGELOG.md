@@ -5,6 +5,29 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-09-16
+
+### Fixed
+
+- `redirect_canonical()` self-loop on bare non-default language home URLs
+  (`/sv/`, `/de/`, `/de-de-formal/`). `Router::resolve()` rewrites
+  `REQUEST_URI` to the unprefixed path before core's canonical redirect runs,
+  so core's own `$redirect_url !== $requested_url` guard compared against the
+  stripped URI and could not see that the proposed target was the URL the
+  visitor actually requested. `filter_redirect_canonical()` now suppresses a
+  redirect that leads back to the current request (`original_uri`, decoded
+  path, query); legitimate canonicalisation (`/sv` -> `/sv/`, http -> https)
+  is unaffected. (#64)
+
+### Added
+
+- Authenticated preferred-language redirect: a logged-in visitor landing on
+  an unprefixed (default-language) URL is redirected once to their stored
+  Regional Preferences language. Anonymous resolution stays strictly
+  URL-authoritative (ADR-0024, cache-safe) and an already-prefixed URL is
+  never overridden. No database migration; schema stays at 10, settings
+  shape at 3.
+
 ## [1.18.0] - 2026-09-11
 
 ### Added — MLW1a multi-language workflow

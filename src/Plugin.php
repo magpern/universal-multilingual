@@ -446,6 +446,8 @@ final class Plugin {
 			$render_cache_bridge
 		);
 
+		$preferred_language = new PreferredLanguage( $languages );
+
 		$router = new Router(
 			$languages,
 			$resolver,
@@ -455,7 +457,8 @@ final class Plugin {
 			$path_canonicalizer,
 			$slug_routes,
 			$route_history,
-			$hierarchy_paths
+			$hierarchy_paths,
+			$preferred_language
 		);
 		$router->register();
 		( new Renderer( $context, $store, $extractor, $block_frontend ) )->register();
@@ -464,7 +467,6 @@ final class Plugin {
 		$switcher->register();
 		( new FloatingSelector( $settings, $languages, $context, $switcher ) )->register();
 
-		$preferred_language = new PreferredLanguage( $languages );
 		PreferenceServices::bind_preferred_language( $preferred_language );
 		( new PreferredLanguageField( $preferred_language ) )->register();
 		( new RegionalPreferencesHost() )->register();

@@ -15,6 +15,7 @@ use AIMultilingual\Language\Languages;
 use AIMultilingual\Plugin;
 use AIMultilingual\Settings;
 use AIMultilingual\Translation\Store;
+use AIMultilingual\User\PreferredLanguage;
 
 /**
  * Resolves the request language from the URL and keeps generated URLs in that
@@ -100,6 +101,13 @@ final class Router {
 	private RouteRecognitionContext $recognition;
 
 	/**
+	 * Authenticated preferred-language authority (redirect-only; optional).
+	 *
+	 * @var PreferredLanguage|null
+	 */
+	private ?PreferredLanguage $preferred_language;
+
+	/**
 	 * Guards term_link localization against nested get_term_link re-entry (v1.5.1 D1).
 	 *
 	 * @var bool
@@ -153,6 +161,7 @@ final class Router {
 	 * @param SlugRouteRepository       $routes        Route repository.
 	 * @param RouteHistoryRepository    $history       History repository.
 	 * @param HierarchyPathBuilder|null $hierarchy   Hierarchy path builder.
+	 * @param PreferredLanguage|null    $preferred_language Authenticated preference authority.
 	 */
 	public function __construct(
 		Languages $languages,
@@ -163,18 +172,20 @@ final class Router {
 		PathCanonicalizer $paths,
 		SlugRouteRepository $routes,
 		RouteHistoryRepository $history,
-		?HierarchyPathBuilder $hierarchy = null
+		?HierarchyPathBuilder $hierarchy = null,
+		?PreferredLanguage $preferred_language = null
 	) {
-		$this->languages     = $languages;
-		$this->resolver      = $resolver;
-		$this->context       = $context;
-		$this->effective_url = $effective_url;
-		$this->settings      = $settings;
-		$this->paths         = $paths;
-		$this->routes        = $routes;
-		$this->history       = $history;
-		$this->hierarchy     = $hierarchy;
-		$this->recognition   = RouteRecognitionContext::none();
+		$this->languages          = $languages;
+		$this->resolver           = $resolver;
+		$this->context            = $context;
+		$this->effective_url      = $effective_url;
+		$this->settings           = $settings;
+		$this->paths              = $paths;
+		$this->routes             = $routes;
+		$this->history            = $history;
+		$this->hierarchy          = $hierarchy;
+		$this->preferred_language = $preferred_language;
+		$this->recognition        = RouteRecognitionContext::none();
 	}
 
 	/**
@@ -220,6 +231,11 @@ final class Router {
 		$this->context->set_current( $resolved['language'] );
 
 		if ( ! $resolved['prefixed'] ) {
+			$this->maybe_redirect_to_authenticated_preference(
+				$this->strip_home_path( $path ),
+				$query
+			);
+
 			return;
 		}
 
@@ -1017,6 +1033,60 @@ final class Router {
 		}
 
 		return $this->build_prefixed_url( $language, $effective, $query );
+	}
+
+	/**
+	 * Redirects an authenticated visitor to their preferred language once,
+	 * when they land on an unprefixed (default-language) URL.
+	 *
+	 * URL-authoritative resolution (ADR-0024) stays exclusive to anonymous
+	 * visitors and to explicit navigation: this only fires for a logged-in
+	 * user hitting a bare, unprefixed URL on a safe (GET) request, and it
+	 * never overrides a URL that already carries a language prefix.
+	 *
+	 * @param string $unprefixed Unprefixed request path.
+	 * @param string $query      Query string without ?.
+	 */
+	private function maybe_redirect_to_authenticated_preference( string $unprefixed, string $query ): void {
+		if ( null === $this->preferred_language ) {
+			return;
+		}
+
+		$method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( (string) wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : 'GET'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( 'GET' !== $method ) {
+			return;
+		}
+
+		if ( ! function_exists( 'is_user_logged_in' ) || ! is_user_logged_in() ) {
+			return;
+		}
+
+		$user_id = get_current_user_id();
+		$code    = $this->preferred_language->get( $user_id );
+		if ( null === $code ) {
+			return;
+		}
+
+		$language = $this->languages->find_by_code( $code );
+		if ( null === $language || ! empty( $language->is_default ) ) {
+			return;
+		}
+
+		$language_id = (int) $language->language_id;
+		$effective   = $unprefixed;
+
+		if ( $this->settings->is_localized_url_generation_enabled() ) {
+			try {
+				$canonical = $this->paths->canonicalize( $unprefixed );
+				$route     = $this->routes->find_active_by_source_path( $language_id, $canonical );
+				$source    = null !== $route ? (string) ( $route->source_path ?? $unprefixed ) : $unprefixed;
+				$effective = $this->effective_url->unprefixed_effective_path( $source, $language_id );
+			} catch ( InvalidPathException $e ) {
+				unset( $e );
+			}
+		}
+
+		$this->redirect_and_exit( $this->build_prefixed_url( $language, $effective, $query ), 302 );
 	}
 
 	/**

@@ -15,7 +15,11 @@ use WP_Error;
 /**
  * Owns `aiml_preferred_language` user meta.
  *
- * Does not influence LanguageResolver / Router. Invalid stored values are
+ * Never influences anonymous LanguageResolver resolution (ADR-0024:
+ * anonymous visitors stay URL-authoritative for cache correctness) and never
+ * overrides an explicit, already-prefixed URL. Router consults this only to
+ * redirect an authenticated visitor away from an unprefixed (default
+ * language) URL toward their stored preference. Invalid stored values are
  * retained and fall back effectively.
  */
 final class PreferredLanguage {

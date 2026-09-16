@@ -32,6 +32,9 @@ GlotPress. See the file's header for the exact source revision and snapshot date
 
 == Changelog ==
 
+= Unreleased =
+* Fixed a redirect_canonical() self-loop on bare non-default language home URLs (/sv/, /de/, /de-de-formal/). Legitimate canonicalisation such as /sv -> /sv/ is unaffected. (#64)
+
 = 1.18.0 =
 * Multi-language ("object x language") workflow. The Workspace loads one page with every target language as a tab and switches language without reloading the page; a "Translate all selected languages with AI" action creates one background batch of jobs across every selected language. The Review Queue is grouped by object with every eligible target language shown as a tab (including one with no pending items, so a forgotten/untranslated language is never hidden), and an "Approve all ready languages" action approves the whole pending set for every clean language in bounded chunks. Site Translate gains a target-language checklist and a pre-run "P pages x Q languages = R translations" count. Universal Multilingual never changes a language's publication status and never publishes content; a bulk or multi-language run targeting an already-published language is rejected without an explicit acknowledgement. Server-authoritative object-language state (the client never re-derives it). New GET aiml/v1/workspace/<id>/languages and POST aiml/v1/workspace/objects/translate. No database migration; schema stays at 10, settings shape at 3.
 

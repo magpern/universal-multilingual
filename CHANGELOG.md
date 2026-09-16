@@ -284,6 +284,16 @@ and `docs/adr/0034-multi-language-workflow.md` (Accepted).
 - `Settings::SCHEMA_VERSION` 2 → 3 adds `promotion_max_package_bytes` and
   `promotion_log_retention`.
 
+### Fixed
+
+- A bare non-default language home (`/sv/`, `/de/`, `/de-de-formal/`) no longer
+  enters a `redirect_canonical()` self-redirect loop. Prefix stripping rewrote
+  `REQUEST_URI` before core's own self-redirect guard ran, so core could not
+  see that the front-page canonical target was the URL already requested. The
+  router now suppresses a canonical redirect that leads straight back to the
+  current request; canonicalisation to a genuinely different URL (adding a
+  trailing slash, an `http` → `https` upgrade) is unaffected. (#64)
+
 ## [1.13.0] - 2026-09-09
 
 ### Changed

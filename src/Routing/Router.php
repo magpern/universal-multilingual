@@ -485,6 +485,20 @@ final class Router {
 			return false;
 		}
 
+		// Issue #64: `resolve()` rewrites `REQUEST_URI` to the unprefixed path,
+		// so core's own `$redirect_url !== $requested_url` guard compares
+		// against the stripped URI and cannot see that the proposed target is
+		// the URL the visitor actually requested. The common case is a bare
+		// non-default language home (`/sv/`): its front-page canonical is
+		// `home_url( '/' )`, which the `home_url` filter turns straight back
+		// into `/sv/`, so the 301 loops. Suppress a redirect that leads back to
+		// the current request; a canonicalisation to a genuinely different URL
+		// (adding a trailing slash, changing scheme, dropping a query) is not
+		// matched and still proceeds.
+		if ( $this->redirect_leads_to_current_request( $redirect_url ) ) {
+			return false;
+		}
+
 		$code = (string) $language->code;
 		$path = (string) wp_parse_url( $redirect_url, PHP_URL_PATH );
 		$path = '/' . ltrim( $path, '/' );
@@ -919,6 +933,59 @@ final class Router {
 		$nb     = untrailingslashit( strtolower( is_string( $nb_raw ) ? $nb_raw : $b ) );
 
 		return $na === $nb;
+	}
+
+	/**
+	 * Whether a proposed canonical redirect target is the URL the visitor
+	 * actually requested (issue #64 self-loop guard).
+	 *
+	 * Compares scheme, host, decoded path (trailing slash is significant) and
+	 * the query string against the request exactly as it arrived, before
+	 * `resolve()` stripped the language prefix. A redirect to a genuinely
+	 * different URL — a missing trailing slash, an http → https upgrade, a
+	 * dropped query parameter — does not match and is left to proceed.
+	 *
+	 * Reads only the request line (`original_uri`, host, scheme); no cookie,
+	 * `Accept-Language` or other visitor-specific state (ADR-0024).
+	 *
+	 * @param string $redirect_url Absolute URL core wants to redirect to.
+	 */
+	private function redirect_leads_to_current_request( string $redirect_url ): bool {
+		if ( '' === $this->original_uri ) {
+			return false;
+		}
+
+		$target = wp_parse_url( $redirect_url );
+		if ( ! is_array( $target ) || ! isset( $target['path'] ) ) {
+			return false;
+		}
+
+		$scheme = is_ssl() ? 'https' : 'http';
+		$host   = isset( $_SERVER['HTTP_HOST'] )
+			? strtolower( (string) wp_unslash( $_SERVER['HTTP_HOST'] ) ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			: '';
+
+		$current = wp_parse_url( $scheme . '://' . $host . $this->original_uri );
+		if ( ! is_array( $current ) || ! isset( $current['path'] ) ) {
+			return false;
+		}
+
+		if ( isset( $target['scheme'] ) && strtolower( (string) $target['scheme'] ) !== $scheme ) {
+			return false;
+		}
+
+		if ( isset( $target['host'] ) && strtolower( (string) $target['host'] ) !== $host ) {
+			return false;
+		}
+
+		if ( rawurldecode( (string) $target['path'] ) !== rawurldecode( (string) $current['path'] ) ) {
+			return false;
+		}
+
+		$target_query  = isset( $target['query'] ) ? (string) $target['query'] : '';
+		$current_query = isset( $current['query'] ) ? (string) $current['query'] : '';
+
+		return $target_query === $current_query;
 	}
 
 	/**

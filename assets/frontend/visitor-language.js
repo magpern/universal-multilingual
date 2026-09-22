@@ -158,23 +158,28 @@
 	}
 
 	/**
-	 * Cookie-driven navigation, continued. No BLANKET "already redirected
-	 * once" guard is kept — that is what previously (and incorrectly)
-	 * suppressed a later, entirely legitimate redirect after the visitor
-	 * explicitly changed language again in the same tab. Loop-freedom for
-	 * the normal case rests on a structural invariant, not a flag: a
-	 * redirect only fires while `code !== c.currentCode`, and landing on
-	 * the target makes `c.currentCode` equal `code` on the next load, so
-	 * this function cannot re-fire for that same visit regardless of
-	 * `c.isDefaultUrl` (which tracks "current language is the site
-	 * default", not literally "no URL prefix" — the two coincide today,
-	 * but the real guarantee is the code-equality check). The same-URL
-	 * check just below is a second, narrower defense for a pathological
-	 * same-destination case. `LAST_REDIRECT_KEY` below is a third,
-	 * destination-scoped (not blanket) last-resort cap — see its use.
+	 * Cookie-driven navigation, continued. No persisted "already redirected"
+	 * guard is kept — sessionStorage in particular was tried and removed
+	 * twice now for two different failure modes: a blanket per-tab flag
+	 * suppressed every later redirect after the visitor changed language
+	 * again, and a destination-keyed flag suppressed a later, entirely
+	 * legitimate redirect to the SAME destination on a later, separate
+	 * visit to the same source URL in the same tab (e.g. revisiting
+	 * `/foo` — or pressing Back to it — after an earlier `/foo` -> `/sv/foo`
+	 * redirect; sessionStorage persists across that, a redirect flag does
+	 * not distinguish "still mid the same redirect" from "a brand new visit
+	 * that happens to compute the same destination"). Any persisted guard
+	 * is the wrong tool here.
+	 *
+	 * Loop-freedom instead rests entirely on two per-invocation structural
+	 * checks, both scoped to THIS single script execution only:
+	 * - a redirect only fires while `code !== c.currentCode`, and landing
+	 *   on the target makes `c.currentCode` equal `code` on the very next
+	 *   load, so this function cannot re-fire for that load;
+	 * - the same-URL equality check just below catches the pathological
+	 *   case of a relationship URL that resolves back to the current page.
+	 * Neither needs, or should have, any memory of earlier page loads.
 	 */
-	var LAST_REDIRECT_KEY = 'aiml_visitor_lang_last_redirect';
-
 	function maybeRedirectFromCookie( c ) {
 		if ( ! c.persistEnabled || ! c.isDefaultUrl ) {
 			return;
@@ -195,22 +200,7 @@
 		if ( destination === window.location.href ) {
 			return;
 		}
-		// Last-resort cap: never repeat the exact same automatic redirect
-		// twice in a row in this tab. Keyed on the specific destination
-		// (not a blanket "already redirected once" flag) so an entirely
-		// different, later, legitimate redirect — e.g. after the visitor
-		// explicitly changes language again — is never suppressed by this.
-		// The primary loop-freedom argument is structural (redirecting
-		// always lands on a page where `code === c.currentCode` becomes
-		// true, so this function cannot fire again for that visit); this is
-		// only a defensive net for an unexpected data inconsistency (e.g. a
-		// relationship URL that round-trips back to the same effective page
-		// after server-side canonicalization).
-		if ( storageGet( window.sessionStorage, LAST_REDIRECT_KEY ) === destination ) {
-			return;
-		}
 
-		storageSet( window.sessionStorage, LAST_REDIRECT_KEY, destination );
 		window.location.replace( destination );
 	}
 

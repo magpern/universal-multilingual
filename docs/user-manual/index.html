@@ -895,7 +895,7 @@ footer.doc-foot {
   <h2>20. Current limitations (v1.12.0)</h2>
   <ul>
     <li>Floating language selector is opt-in (default Off); it does not replace theme/menu switchers.</li>
-    <li>Preferred language is a signed-in preference only — it does not change the current URL language or set an anonymous cookie.</li>
+    <li>The signed-in <a href="#regional-preferences">account preferred language</a> never changes the current URL language by itself and never sets a cookie directly — it only redirects a signed-in visitor away from the default-language URL toward their stored preference. Separately, anonymous visitors can have an explicit selector click remembered in a first-party <code>aiml_visitor_lang</code> browser cookie — see <a href="#visitor-language">3c. Visitor language (anonymous)</a>. The two are distinct mechanisms: one is account storage plus a login-time redirect, the other is a client-side-only anonymous cookie.</li>
     <li>Site Translate covers pages/posts/products only (not menus/terms one-click).</li>
     <li>Jobs → Operations linking is source-level only (no translation_id enrichment).</li>
     <li>Richer multi-language UX polish remains backlog.</li>

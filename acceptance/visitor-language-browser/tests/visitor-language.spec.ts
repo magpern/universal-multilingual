@@ -366,6 +366,49 @@ test('same tab: a second explicit language change still redirects from a later u
   expect(new URL(page.url()).pathname).toBe('/de/');
 });
 
+test('same tab: revisiting the same unprefixed URL later still redirects again', async ({ page, context }) => {
+  // A destination-keyed sessionStorage guard was tried and removed for
+  // exactly this failure mode: cookie=sv redirects /->/sv/ once; later, in
+  // the SAME tab, a fresh visit to the unprefixed URL that resolves to the
+  // SAME destination must still redirect — it must not be silently
+  // suppressed just because that destination was already visited earlier
+  // in this tab's history.
+  patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
+  await setVisitorCookie(context, 'sv');
+
+  await openPublic(page);
+  await page.waitForURL(/\/sv\//, { timeout: 10_000 });
+
+  // A later, separate visit to the unprefixed URL (not a Back navigation —
+  // covered separately below) — same cookie, same expected destination.
+  await openPublic(page);
+  await page.waitForURL(/\/sv\//, { timeout: 10_000 });
+  expect(new URL(page.url()).pathname).toBe('/sv/');
+});
+
+test('browser Back to the unprefixed URL still redirects again', async ({ page, context }) => {
+  // window.location.replace() (used for the automatic redirect) does not
+  // create a history entry for the unprefixed URL, so a real Back-to-the-
+  // unprefixed-URL history entry has to be created without triggering that
+  // first redirect — otherwise Back would simply land on the already-
+  // redirected /sv/ page, exercising nothing new. Disable persistence for
+  // the first visit (a real, un-replaced history entry at '/'), then
+  // re-enable it, navigate away, and Back to '/' — the most natural
+  // real-world way a visitor revisits a source URL in the same tab.
+  patchSettings({ visitor_cookie_persist_enabled: false, visitor_autodetect_enabled: false });
+  await setVisitorCookie(context, 'sv');
+  await openPublic(page);
+  await page.waitForTimeout(500);
+  expect(new URL(page.url()).pathname).toBe('/');
+
+  patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
+  await openPublic(page, '/de/');
+
+  await page.goBack();
+  await page.waitForURL(/\/sv\//, { timeout: 10_000 });
+  expect(new URL(page.url()).pathname).toBe('/sv/');
+});
+
 test('cookie-driven redirect preserves multiple query parameters and a hash losslessly', async ({ page, context }) => {
   patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
   await setVisitorCookie(context, 'sv');

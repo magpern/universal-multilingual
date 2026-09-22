@@ -249,6 +249,12 @@ final class VisitorLanguageCookie {
 	 * Fires only from an authenticated login response, never from an
 	 * anonymous render path — see the class docblock.
 	 *
+	 * `secure` is requested unconditionally, not derived from `is_ssl()`.
+	 * ADR-0035 freezes this cookie as Secure because both real deployments
+	 * (DEV and PROD) are HTTPS-only, verified during planning — that is a
+	 * declared architectural property of the cookie, not something to infer
+	 * per-request from the current connection.
+	 *
 	 * @param string $code Validated language code.
 	 */
 	private function write_cookie( string $code ): void {
@@ -258,7 +264,7 @@ final class VisitorLanguageCookie {
 			array(
 				'expires'  => time() + self::MAX_AGE_SECONDS,
 				'path'     => '/',
-				'secure'   => is_ssl(),
+				'secure'   => true,
 				'httponly' => false,
 				'samesite' => 'Lax',
 			)

@@ -112,7 +112,19 @@ test('cookie-driven redirect only reads the cookie, never rewrites it', async ({
   const cookies = await context.cookies();
   const cookie = cookies.find((c) => c.name === COOKIE_NAME);
   expect(cookie?.value).toBe('sv');
-  // Host-only: Playwright reports the exact host with no leading dot.
+  // Host-only cookie proof: Playwright's CDP-backed cookie API reports the
+  // exact host with no leading dot only for a genuinely host-only cookie —
+  // a cookie with an explicit Domain attribute (even Domain=dev.biopentra.eu)
+  // is reported with a leading dot by the same API, so this assertion does
+  // distinguish the two. A true cross-host non-delivery test (proving the
+  // browser never sends this cookie to a different real host) would need a
+  // second live hostname pointed at this deployment; none exists (the SWAG
+  // vhost is `server_name _;`, a catch-all, not a dedicated second domain),
+  // and inventing one is out of scope for a test. Combined with the
+  // implementation never setting `Domain` (verified directly in both
+  // visitor-language.js's writeCookie() and VisitorLanguageCookie::
+  // write_cookie()'s option array, neither of which includes a 'domain'
+  // key), this is treated as verified-by-construction rather than an open item.
   expect(cookie?.domain).toBe(HOST);
 });
 
@@ -314,6 +326,73 @@ test('geo fallback: an unmapped country produces no suggestion', async ({ page, 
   await openPublic(page);
   await page.waitForTimeout(2000);
   await expect(page.locator(BANNER)).toHaveCount(0);
+});
+
+test('same tab: a second explicit language change still redirects from a later unprefixed visit', async ({ page, context }) => {
+  // Reproduces the reported sequence: cookie=sv redirects /->/sv/, the
+  // visitor then explicitly changes to de (cookie becomes de), and a LATER
+  // unprefixed visit in the same tab must still redirect — to /de/, not be
+  // silently suppressed by a stale "already redirected once" guard.
+  patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
+  await setVisitorCookie(context, 'sv');
+
+  await openPublic(page);
+  await page.waitForURL(/\/sv\//, { timeout: 10_000 });
+
+  // Simulate the visitor's explicit selector click changing the cookie to
+  // 'de' (the click-persist mechanics themselves are covered by the
+  // "explicit selector click" test above; this test is specifically about
+  // the redirect guard, not re-testing the click).
+  await setVisitorCookie(context, 'de');
+
+  await openPublic(page);
+  await page.waitForURL(/\/de\//, { timeout: 10_000 });
+  expect(new URL(page.url()).pathname).toBe('/de/');
+});
+
+test('cookie-driven redirect preserves repeated query parameters and a hash losslessly', async ({ page, context }) => {
+  patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
+  await setVisitorCookie(context, 'sv');
+
+  await page.goto(`/?filter=a&filter=b&${PROBE}#section`, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL(/\/sv\//, { timeout: 10_000 });
+
+  const url = new URL(page.url());
+  expect(url.pathname).toBe('/sv/');
+  expect(url.searchParams.getAll('filter')).toEqual(['a', 'b']);
+  expect(url.hash).toBe('#section');
+});
+
+test('WooCommerce: cart contents survive an explicit language switch', async ({ page, context }) => {
+  patchSettings({
+    visitor_cookie_persist_enabled: true,
+    visitor_autodetect_enabled: false,
+    floating_selector_enabled: true,
+    floating_selector_show_desktop: true,
+    floating_selector_show_mobile: true,
+  });
+  await context.clearCookies();
+
+  await page.goto(`/product/bpc-157/?${PROBE}`, { waitUntil: 'domcontentloaded' });
+  await page.locator('.single_add_to_cart_button').click();
+  await page.waitForLoadState('domcontentloaded');
+
+  await page.goto(`/cart/?${PROBE}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.woocommerce-cart-form, .cart_item').first()).toBeVisible({ timeout: 10_000 });
+
+  const nav = page.locator(SELECTOR);
+  await expect(nav).toHaveCount(1);
+  const enhanced = await nav.getAttribute('data-aiml-enhanced');
+  if (enhanced === '1') {
+    await nav.locator('.aiml-floating-selector__toggle').click();
+  }
+  const other = nav.locator('a[data-aiml-code]:not([aria-current="page"])').first();
+  await other.click();
+  await page.waitForLoadState('domcontentloaded');
+
+  // Still on a /cart/ page (now language-prefixed), with the item intact.
+  expect(new URL(page.url()).pathname).toMatch(/\/cart\/?$/);
+  await expect(page.locator('.woocommerce-cart-form, .cart_item').first()).toBeVisible({ timeout: 10_000 });
 });
 
 test('geo fallback fails safe on a malformed/errored response', async ({ page, context }) => {

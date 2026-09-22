@@ -76,11 +76,12 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		foreach ( $this->cookie_writes as $write ) {
 			if ( VisitorLanguageCookie::COOKIE_NAME === $write[0] && $expected_value === $write[1] ) {
 				$found = true;
-				// SameSite=Lax + Secure are always requested; is_ssl() drives
-				// 'secure' at runtime, so only the always-present keys are checked here.
 				$this->assertSame( 'Lax', $write[2]['samesite'] );
 				$this->assertFalse( $write[2]['httponly'] );
 				$this->assertSame( '/', $write[2]['path'] );
+				// ADR-0035: Secure is requested unconditionally, never derived
+				// from is_ssl() — both real deployments are HTTPS-only.
+				$this->assertTrue( $write[2]['secure'] );
 				break;
 			}
 		}

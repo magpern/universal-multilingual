@@ -14,7 +14,6 @@
 	var COOKIE_MAX_AGE = 31536000; // 1 year, matches VisitorLanguageCookie.
 	var DISMISS_KEY = 'aiml_visitor_lang_suggest_dismissed';
 	var DISMISS_DAYS = 30;
-	var REDIRECT_GUARD_KEY = 'aiml_visitor_lang_redirected';
 	var GEO_TIMEOUT_MS = 1500;
 
 	function cfg() {
@@ -32,12 +31,18 @@
 		return match ? decodeURIComponent( match[ 1 ] ) : null;
 	}
 
-	/** Writes the visitor-language cookie. Only ever called from an explicit action. */
+	/**
+	 * Writes the visitor-language cookie. Only ever called from an explicit
+	 * action. `Secure` is requested unconditionally, not merely when the
+	 * current page happens to be HTTPS — ADR-0035 freezes this cookie as
+	 * Secure because both real deployments (DEV and PROD) are HTTPS-only;
+	 * this is a declared architectural property, not something to infer
+	 * per-request from `location.protocol`.
+	 */
 	function writeCookie( code ) {
 		try {
-			var secure = 'https:' === window.location.protocol ? '; Secure' : '';
 			document.cookie = cookieName() + '=' + encodeURIComponent( code ) +
-				'; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; SameSite=Lax' + secure;
+				'; Path=/; Max-Age=' + COOKIE_MAX_AGE + '; SameSite=Lax; Secure';
 		} catch ( e ) {
 			// Navigation/UX remains functional even if the cookie can't be written.
 		}
@@ -114,18 +119,35 @@
 	 * explicit language prefix: an explicitly-prefixed URL is authoritative for
 	 * its own request and is never fought by the cookie.
 	 */
-	/** Appends the current request's query string and hash to a canonical
-	 *  target URL, so an automatic redirect never silently drops search
-	 *  terms, pagination, filters, or one-time keys (e.g. a WooCommerce
-	 *  order-received `key=`) that a deliberate switcher click would also
-	 *  lose today, but which this *automatic* redirect must not. */
+	/**
+	 * Appends the current request's query string and hash to a canonical
+	 * target URL, so an automatic redirect never silently drops search
+	 * terms, pagination, filters, or one-time keys (e.g. a WooCommerce
+	 * order-received `key=`) that a deliberate switcher click would also
+	 * lose today, but which this *automatic* redirect must not.
+	 *
+	 * Preserved losslessly: canonical per-language URLs never carry their
+	 * own query string (they are built from path only), so the current
+	 * request's raw query string is copied through as-is rather than
+	 * reconstructed via `URLSearchParams`/`.set()`, which would silently
+	 * collapse repeated keys (`?filter=a&filter=b` becoming `?filter=b`).
+	 * In the defensive case a target URL somehow does carry its own query
+	 * already, both raw query strings are concatenated rather than merged
+	 * key-by-key, so neither side's duplicate keys are ever dropped.
+	 */
 	function withCurrentQueryAndHash( targetUrl ) {
 		try {
 			var target = new URL( targetUrl, window.location.origin );
-			var current = new URLSearchParams( window.location.search );
-			current.forEach( function ( value, key ) {
-				target.searchParams.set( key, value );
-			} );
+			var targetQuery = target.search ? target.search.slice( 1 ) : '';
+			var currentQuery = window.location.search ? window.location.search.slice( 1 ) : '';
+			var parts = [];
+			if ( targetQuery ) {
+				parts.push( targetQuery );
+			}
+			if ( currentQuery ) {
+				parts.push( currentQuery );
+			}
+			target.search = parts.join( '&' );
 			if ( window.location.hash ) {
 				target.hash = window.location.hash;
 			}
@@ -135,11 +157,22 @@
 		}
 	}
 
+	/**
+	 * Cookie-driven navigation, continued. No session-scoped "already
+	 * redirected" guard is needed: a redirect only ever fires when the
+	 * current URL is unprefixed (`c.isDefaultUrl`) and the target differs
+	 * from the current language, and every redirect target is an
+	 * explicitly-prefixed canonical URL — landing there makes
+	 * `c.isDefaultUrl` false on the next load, which is itself sufficient
+	 * to prevent this function from ever firing twice for the same visit.
+	 * The same-URL check below is the actual, narrower defense against a
+	 * pathological same-destination loop; a blanket per-tab guard would
+	 * (and previously did) incorrectly suppress a later, entirely
+	 * legitimate redirect after the visitor explicitly changes language
+	 * again in the same tab.
+	 */
 	function maybeRedirectFromCookie( c ) {
 		if ( ! c.persistEnabled || ! c.isDefaultUrl ) {
-			return;
-		}
-		if ( '1' === storageGet( window.sessionStorage, REDIRECT_GUARD_KEY ) ) {
 			return;
 		}
 
@@ -154,14 +187,11 @@
 		}
 
 		var destination = withCurrentQueryAndHash( target.url );
-		// Defense in depth: never replace the page with the URL already
-		// showing, even if session storage is unavailable (e.g. Safari
-		// Lockdown Mode) and the guard above could not be trusted.
+		// Never replace the page with the URL already showing.
 		if ( destination === window.location.href ) {
 			return;
 		}
 
-		storageSet( window.sessionStorage, REDIRECT_GUARD_KEY, '1' );
 		window.location.replace( destination );
 	}
 

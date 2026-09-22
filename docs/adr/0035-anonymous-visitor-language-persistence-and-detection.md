@@ -176,9 +176,17 @@ link on the page. The suggestion banner is a separate, new, small UI element.
   behavior on upgrade: a visitor's own deliberate selector click may now
   persist. This is the entire point of the milestone; gating it behind an
   extra opt-in would ship a selector that still forgets the choice by default.
-- `visitor_autodetect_enabled` (and its browser/geo sub-flags) default
-  **false** — automatic suggestions are opt-in and never activate merely
-  because the plugin was upgraded.
+- `visitor_autodetect_enabled` — the master switch for automatic browser/geo
+  suggestions — defaults **false**, so automatic behavior is opt-in and never
+  activates merely because the plugin was upgraded. Its two sub-flags default
+  independently of the master: `visitor_autodetect_browser_enabled` defaults
+  **true** (so switching the master on gets a sensible, immediately-useful
+  configuration without a second opt-in step) and
+  `visitor_autodetect_geo_enabled` defaults **false** (geo depends on a second
+  plugin, so it stays an explicit choice even once the master is on). Neither
+  sub-flag has any effect while the master is off, so the net upgrade
+  behavior is unchanged: no automatic suggestion appears until an admin
+  explicitly turns the master switch on.
 - Existing translations, routing, URL structure, rendering, SEO, account
   preferences, and cache behavior are unchanged for every installation,
   regardless of settings. An installation that receives no visitor clicks

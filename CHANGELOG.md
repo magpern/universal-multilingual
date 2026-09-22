@@ -5,6 +5,36 @@ All notable changes to Universal Multilingual are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.21.0] - 2026-09-22
+
+### Added
+
+- Anonymous-visitor language persistence and detection (ADR-0035). A
+  visitor's own explicit language selection may now be remembered in a
+  first-party `aiml_visitor_lang` cookie, written/read entirely client-side
+  so anonymous server-side rendering stays a pure function of
+  `host + request_uri` for a given URL (ADR-0024's cache contract is
+  unchanged; verified against the live reverse-proxy config). A later visit
+  to the site's unprefixed/default-language URL client-side-redirects to the
+  remembered language; an explicit language already in the URL always wins.
+- Optional, opt-in browser-language and geo-location suggestion banner.
+  Never a silent switch — always a dismissible suggestion the visitor must
+  accept. Browser detection uses `navigator.languages`/`navigator.language`;
+  geo fallback consumes Universal Geo Context's public REST endpoint
+  client-side only (no hard dependency) against an admin-owned
+  country-to-language map with no shipped defaults.
+- Login/registration synchronization: a new account inherits a genuinely
+  anonymous visitor's cookie-based preference when it has none yet; an
+  existing account preference always wins and the cookie is reissued to
+  match it at login; logout leaves the cookie untouched.
+- New settings: `visitor_cookie_persist_enabled` (default on),
+  `visitor_autodetect_enabled` / `_browser_enabled` / `_geo_enabled`
+  (master default off), `geo_language_map`. `Settings::SCHEMA_VERSION`
+  3 → 4 (additive; no database schema change).
+- Reuses the existing `[aiml_switcher]` and floating language selector as
+  the sole visitor-facing language controls — no competing selector was
+  introduced.
+
 ## [1.20.0] - 2026-09-16
 
 ### Added

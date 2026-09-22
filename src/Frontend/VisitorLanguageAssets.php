@@ -141,8 +141,10 @@ final class VisitorLanguageAssets {
 			self::SCRIPT_HANDLE,
 			'aimlVisitorLanguageStrings',
 			array(
-				'accept'  => __( 'Switch', 'universal-multilingual' ),
-				'dismiss' => __( 'Dismiss', 'universal-multilingual' ),
+				'accept'      => __( 'Switch', 'universal-multilingual' ),
+				'dismiss'     => __( 'Dismiss', 'universal-multilingual' ),
+				'switchTo'    => __( 'Switch to {language}?', 'universal-multilingual' ),
+				'regionLabel' => __( 'Language suggestion', 'universal-multilingual' ),
 			)
 		);
 	}

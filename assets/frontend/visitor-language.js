@@ -88,10 +88,6 @@
 	 * never blocks, never delays navigation.
 	 */
 	function wireClickPersist( c ) {
-		if ( ! c.persistEnabled ) {
-			return;
-		}
-
 		document.addEventListener( 'click', function ( event ) {
 			var link = event.target && event.target.closest ? event.target.closest( '[data-aiml-code]' ) : null;
 			if ( ! link ) {
@@ -101,9 +97,14 @@
 			if ( '' === code ) {
 				return;
 			}
-			writeCookie( code );
-			// Dismiss any pending suggestion — the visitor just made an explicit choice.
+			// Dismiss any pending suggestion — the visitor just made an
+			// explicit choice — regardless of whether cookie persistence
+			// itself is enabled; otherwise disabling persistence would also
+			// silently disable "don't nag me again", which is a separate concern.
 			storageSet( window.localStorage, DISMISS_KEY, String( Date.now() ) );
+			if ( c.persistEnabled ) {
+				writeCookie( code );
+			}
 		} );
 	}
 
@@ -113,6 +114,27 @@
 	 * explicit language prefix: an explicitly-prefixed URL is authoritative for
 	 * its own request and is never fought by the cookie.
 	 */
+	/** Appends the current request's query string and hash to a canonical
+	 *  target URL, so an automatic redirect never silently drops search
+	 *  terms, pagination, filters, or one-time keys (e.g. a WooCommerce
+	 *  order-received `key=`) that a deliberate switcher click would also
+	 *  lose today, but which this *automatic* redirect must not. */
+	function withCurrentQueryAndHash( targetUrl ) {
+		try {
+			var target = new URL( targetUrl, window.location.origin );
+			var current = new URLSearchParams( window.location.search );
+			current.forEach( function ( value, key ) {
+				target.searchParams.set( key, value );
+			} );
+			if ( window.location.hash ) {
+				target.hash = window.location.hash;
+			}
+			return target.toString();
+		} catch ( e ) {
+			return targetUrl;
+		}
+	}
+
 	function maybeRedirectFromCookie( c ) {
 		if ( ! c.persistEnabled || ! c.isDefaultUrl ) {
 			return;
@@ -131,8 +153,16 @@
 			return;
 		}
 
+		var destination = withCurrentQueryAndHash( target.url );
+		// Defense in depth: never replace the page with the URL already
+		// showing, even if session storage is unavailable (e.g. Safari
+		// Lockdown Mode) and the guard above could not be trusted.
+		if ( destination === window.location.href ) {
+			return;
+		}
+
 		storageSet( window.sessionStorage, REDIRECT_GUARD_KEY, '1' );
-		window.location.replace( target.url );
+		window.location.replace( destination );
 	}
 
 	// -- Suggestion banner (browser/geo — automatic signals, suggestion only) --
@@ -220,14 +250,21 @@
 			return;
 		}
 
+		var strings = window.aimlVisitorLanguageStrings || {};
+		var label = target.label ? target.label : code;
+
 		var bar = document.createElement( 'div' );
 		bar.className = 'aiml-visitor-suggest';
 		bar.setAttribute( 'role', 'region' );
-		bar.setAttribute( 'aria-label', target.label || code );
+		// Static, purpose-describing accessible name for the region itself
+		// (not just the target language), plus aria-live so assistive tech
+		// announces the banner's arrival without stealing keyboard focus.
+		bar.setAttribute( 'aria-label', strings.regionLabel || 'Language suggestion' );
+		bar.setAttribute( 'aria-live', 'polite' );
 
 		var text = document.createElement( 'span' );
 		text.className = 'aiml-visitor-suggest__text';
-		text.textContent = target.label ? target.label : code;
+		text.textContent = ( strings.switchTo || 'Switch to {language}?' ).replace( '{language}', label );
 		bar.appendChild( text );
 
 		var accept = document.createElement( 'a' );

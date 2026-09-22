@@ -17,8 +17,15 @@ use AIMultilingual\User\VisitorLanguageCookie;
  * Covers the one narrowly-scoped PHP path allowed to read/write
  * `aiml_visitor_lang` — exercised only via the authenticated `wp_login` and
  * `user_register` hooks, never from an anonymous render path (see
- * PluginGuardTest::test_no_cookie_is_set for the enforced boundary, and
- * RoutingTest for proof the anonymous render path never touches this cookie).
+ * PluginGuardTest::test_no_cookie_is_set for the enforced boundary).
+ *
+ * Deliberately does NOT call `wp_set_current_user()` before invoking
+ * `on_register()`/`on_login()` (except where a test specifically wants a
+ * *different* already-authenticated actor): `user_register` fires inside
+ * `wp_insert_user()` and `wp_login` fires inside `wp_signon()`, both before
+ * WordPress core establishes any current user for the request. A test that
+ * pre-authenticates as the target user before calling these methods would
+ * not reproduce the conditions the hooks actually fire under.
  */
 final class VisitorLanguageCookieTest extends AimlTestCase {
 
@@ -50,10 +57,12 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		);
 
 		$_COOKIE = array();
+		wp_set_current_user( 0 );
 	}
 
 	protected function tearDown(): void {
 		$_COOKIE = array();
+		wp_set_current_user( 0 );
 		parent::tearDown();
 	}
 
@@ -87,7 +96,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = 'sv';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 
 		$this->cookie_service->on_register( $user_id );
 
@@ -98,7 +106,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = '../../etc/passwd';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 
 		$this->cookie_service->on_register( $user_id );
 
@@ -110,7 +117,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = 'sv';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 
 		$this->cookie_service->on_register( $user_id );
 
@@ -123,7 +129,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = 'sv';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 		update_user_meta( $user_id, PreferredLanguage::META_KEY, 'de' );
 
 		$this->cookie_service->on_register( $user_id );
@@ -137,7 +142,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$user    = get_userdata( $user_id );
-		wp_set_current_user( $user_id );
 
 		$this->cookie_service->on_login( (string) $user->user_login, $user );
 
@@ -151,7 +155,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = 'sv';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 		update_user_meta( $user_id, PreferredLanguage::META_KEY, 'de' );
 
 		$user = get_userdata( $user_id );
@@ -168,7 +171,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		// No cookie present at all.
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 		update_user_meta( $user_id, PreferredLanguage::META_KEY, 'sv' );
 
 		$user = get_userdata( $user_id );
@@ -179,7 +181,6 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 
 	public function test_login_with_no_account_preference_and_no_cookie_writes_nothing(): void {
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 
 		$user = get_userdata( $user_id );
 		$this->cookie_service->on_login( (string) $user->user_login, $user );
@@ -191,12 +192,40 @@ final class VisitorLanguageCookieTest extends AimlTestCase {
 		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = '<script>';
 
 		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
 
 		$user = get_userdata( $user_id );
 		$this->cookie_service->on_login( (string) $user->user_login, $user );
 
 		$this->assertSame( '', get_user_meta( $user_id, PreferredLanguage::META_KEY, true ) );
+		$this->assert_no_cookie_header_emitted();
+	}
+
+	/**
+	 * An admin/staff member creating an account for someone else (current
+	 * user already authenticated as someone other than the new account) must
+	 * never have their own visitor cookie seed a stranger's preference.
+	 */
+	public function test_registration_skipped_when_another_user_is_already_authenticated(): void {
+		$this->add_language( 'sv', 'sv_SE', Languages::STATUS_PUBLISHED );
+		$_COOKIE[ VisitorLanguageCookie::COOKIE_NAME ] = 'sv';
+
+		$admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $admin_id );
+
+		$new_user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		$this->cookie_service->on_register( $new_user_id );
+
+		$this->assertSame( '', get_user_meta( $new_user_id, PreferredLanguage::META_KEY, true ) );
+	}
+
+	/**
+	 * A third-party caller firing `do_action( 'wp_login', $user_login )` with
+	 * only one argument must not fatal a strictly-typed two-argument
+	 * callback, and must not write anything.
+	 */
+	public function test_login_with_missing_user_argument_does_nothing(): void {
+		$this->cookie_service->on_login( 'someone' );
+
 		$this->assert_no_cookie_header_emitted();
 	}
 }

@@ -192,6 +192,18 @@ briefly see the default-language page before the client-side redirect fires
 the proxy cache untouched — the alternative (a proxy cache-key change) was
 explicitly declined in favor of the smaller, fully plugin-scoped correction.
 
+Safari/WebKit's Intelligent Tracking Prevention caps the lifetime of a cookie
+written by first-party JavaScript (`document.cookie`, exactly how this
+cookie is written for anonymous visitors) at roughly 7 days, regardless of
+the `Max-Age` requested. On Safari/iOS, an anonymous visitor's explicit
+language choice therefore persists for about a week, not a year, and quietly
+re-defaults after that — the account-preference path (login) is unaffected,
+since that reissue goes through PHP `setcookie()` on an authenticated
+response, which ITP does not cap the same way. This is an accepted
+limitation of doing anonymous persistence entirely client-side (the option
+(a) resolution this ADR chose) rather than a defect; there is no client-side
+workaround for a browser vendor's cookie-lifetime policy.
+
 ## Scope
 
 This ADR only concerns anonymous language *selection and persistence*. It

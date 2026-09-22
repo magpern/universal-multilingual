@@ -94,6 +94,18 @@ final class VisitorLanguageCookie {
 	 * same request. It never overwrites a preference some other flow already
 	 * set (registration only seeds an empty slot).
 	 *
+	 * `PreferredLanguage::get()/set()` are permission-gated (self or
+	 * `edit_user`), and `user_register` fires inside `wp_insert_user()` before
+	 * WordPress establishes any current user for the request — so those checks
+	 * would otherwise always fail. Two things make it safe to bridge that gap
+	 * here: (1) only a genuinely anonymous registration (no other user already
+	 * authenticated in this same request) is eligible at all — an admin or
+	 * staff member creating an account for someone else must never have their
+	 * own cookie seed a stranger's preference; (2) the elevation is scoped to
+	 * exactly this one call and always restored, and the value it seeds still
+	 * comes from `$_COOKIE`, which reflects the actual requesting browser
+	 * regardless of who `get_current_user_id()` reports.
+	 *
 	 * @param int $user_id Newly created user id.
 	 */
 	public function on_register( int $user_id ): void {
@@ -101,7 +113,10 @@ final class VisitorLanguageCookie {
 			return;
 		}
 
-		if ( null !== $this->preferred_language->get( $user_id ) ) {
+		if ( get_current_user_id() > 0 ) {
+			// Someone else (admin/staff) is creating this account — not a
+			// genuine anonymous self-registration. Their cookie must never
+			// seed a different account's preference.
 			return;
 		}
 
@@ -110,7 +125,16 @@ final class VisitorLanguageCookie {
 			return;
 		}
 
-		$this->preferred_language->set( $user_id, $code );
+		$this->as_user(
+			$user_id,
+			function () use ( $user_id, $code ): void {
+				if ( null !== $this->preferred_language->get( $user_id ) ) {
+					return;
+				}
+
+				$this->preferred_language->set( $user_id, $code );
+			}
+		);
 	}
 
 	/**
@@ -119,27 +143,72 @@ final class VisitorLanguageCookie {
 	 * registration). Either way, reissue the cookie once to match the
 	 * now-effective account preference.
 	 *
-	 * @param string  $user_login Unused; required by the `wp_login` signature.
-	 * @param WP_User $user       Logged-in user.
+	 * `wp_login` fires inside `wp_signon()` — `wp_set_auth_cookie()` has
+	 * already run, but WordPress does not populate `get_current_user_id()`
+	 * for the rest of this request until a later request re-derives it from
+	 * the auth cookie. `PreferredLanguage::get()/set()` are permission-gated
+	 * on the current user, so this method must temporarily establish it for
+	 * exactly the user who just authenticated (see {@see self::as_user()}).
+	 *
+	 * Accepts a nullable, defaulted `$user` because a third-party caller that
+	 * fires `do_action( 'wp_login', $user_login )` with only one argument
+	 * must not fatal a strictly-typed two-argument callback.
+	 *
+	 * @param string       $user_login Unused; required by the `wp_login` signature.
+	 * @param WP_User|null $user       Logged-in user, when supplied.
 	 */
-	public function on_login( string $user_login, WP_User $user ): void {
+	public function on_login( string $user_login, ?WP_User $user = null ): void {
 		unset( $user_login );
 
-		$user_id  = (int) $user->ID;
-		$existing = $this->preferred_language->get( $user_id );
+		if ( null === $user || ! isset( $user->ID ) ) {
+			return;
+		}
 
-		if ( null === $existing ) {
-			$code = $this->read_valid_cookie_value();
-			if ( null !== $code ) {
-				$result = $this->preferred_language->set( $user_id, $code );
-				if ( true === $result ) {
-					$existing = $code;
+		$user_id = (int) $user->ID;
+		if ( $user_id <= 0 ) {
+			return;
+		}
+
+		$existing = null;
+
+		$this->as_user(
+			$user_id,
+			function () use ( $user_id, &$existing ): void {
+				$existing = $this->preferred_language->get( $user_id );
+
+				if ( null === $existing ) {
+					$code = $this->read_valid_cookie_value();
+					if ( null !== $code ) {
+						$result = $this->preferred_language->set( $user_id, $code );
+						if ( true === $result ) {
+							$existing = $code;
+						}
+					}
 				}
 			}
-		}
+		);
 
 		if ( null !== $existing ) {
 			$this->write_cookie( $existing );
+		}
+	}
+
+	/**
+	 * Runs `$callback` with the current user temporarily set to `$user_id`,
+	 * always restoring the prior current user afterward (even on exception).
+	 * Scoped to this class only — never used from an anonymous render path.
+	 *
+	 * @param int      $user_id  User id to act as.
+	 * @param callable $callback `fn(): void`.
+	 */
+	private function as_user( int $user_id, callable $callback ): void {
+		$previous_id = get_current_user_id();
+		wp_set_current_user( $user_id );
+
+		try {
+			$callback();
+		} finally {
+			wp_set_current_user( $previous_id );
 		}
 	}
 

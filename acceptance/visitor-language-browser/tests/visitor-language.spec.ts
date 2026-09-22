@@ -263,3 +263,78 @@ test('autodetect disabled: no banner appears even with a matching browser langua
   await page.waitForTimeout(500);
   await expect(page.locator(BANNER)).toHaveCount(0);
 });
+
+test('geo fallback: suggests a mapped language only when browser produced no match', async ({ page, context }) => {
+  patchSettings({
+    visitor_cookie_persist_enabled: true,
+    visitor_autodetect_enabled: true,
+    visitor_autodetect_browser_enabled: true,
+    visitor_autodetect_geo_enabled: true,
+    geo_language_map: { SE: 'sv' },
+    floating_selector_enabled: false,
+  });
+  await context.clearCookies();
+  // 'fr-FR' matches no enabled language, so browser detection must fall
+  // through to geo, per the frozen precedence (browser beats geo).
+  await page.addInitScript(() => {
+    Object.defineProperty(window.navigator, 'language', { get: () => 'fr-FR' });
+    Object.defineProperty(window.navigator, 'languages', { get: () => ['fr-FR'] });
+  });
+  await context.route('**/wp-json/universal-geo-context/v1/context**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'SE' }) });
+  });
+
+  await openPublic(page);
+  const banner = page.locator(BANNER);
+  await expect(banner).toHaveCount(1, { timeout: 10_000 });
+
+  const accept = banner.locator('.aiml-visitor-suggest__accept');
+  await expect(accept).toHaveAttribute('data-aiml-code', 'sv');
+});
+
+test('geo fallback: an unmapped country produces no suggestion', async ({ page, context }) => {
+  patchSettings({
+    visitor_cookie_persist_enabled: true,
+    visitor_autodetect_enabled: true,
+    visitor_autodetect_browser_enabled: true,
+    visitor_autodetect_geo_enabled: true,
+    geo_language_map: { SE: 'sv' },
+    floating_selector_enabled: false,
+  });
+  await context.clearCookies();
+  await page.addInitScript(() => {
+    Object.defineProperty(window.navigator, 'language', { get: () => 'fr-FR' });
+    Object.defineProperty(window.navigator, 'languages', { get: () => ['fr-FR'] });
+  });
+  // Country not present in geo_language_map.
+  await context.route('**/wp-json/universal-geo-context/v1/context**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ country_code: 'FR' }) });
+  });
+
+  await openPublic(page);
+  await page.waitForTimeout(2000);
+  await expect(page.locator(BANNER)).toHaveCount(0);
+});
+
+test('geo fallback fails safe on a malformed/errored response', async ({ page, context }) => {
+  patchSettings({
+    visitor_cookie_persist_enabled: true,
+    visitor_autodetect_enabled: true,
+    visitor_autodetect_browser_enabled: true,
+    visitor_autodetect_geo_enabled: true,
+    geo_language_map: { SE: 'sv' },
+    floating_selector_enabled: false,
+  });
+  await context.clearCookies();
+  await page.addInitScript(() => {
+    Object.defineProperty(window.navigator, 'language', { get: () => 'fr-FR' });
+    Object.defineProperty(window.navigator, 'languages', { get: () => ['fr-FR'] });
+  });
+  await context.route('**/wp-json/universal-geo-context/v1/context**', async (route) => {
+    await route.fulfill({ status: 500, contentType: 'text/plain', body: 'error' });
+  });
+
+  await openPublic(page);
+  await page.waitForTimeout(2000);
+  await expect(page.locator(BANNER)).toHaveCount(0);
+});

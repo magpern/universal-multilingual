@@ -405,6 +405,20 @@ test('browser Back to the unprefixed URL still redirects again', async ({ page, 
   await openPublic(page, '/de/');
 
   await page.goBack();
+  await page.waitForLoadState('domcontentloaded');
+  // Guard against Chromium's back-forward cache restoring the earlier
+  // (persistEnabled:false) document without re-running its scripts, which
+  // would make this test fail — or pass — for a reason unrelated to the
+  // redirect logic under test. A fresh document reflects the just-patched
+  // (persistEnabled:true) settings; a bfcache-restored one would not.
+  // wp_localize_script encodes PHP booleans as "1"/"" strings, so check
+  // truthiness (matching how the shipped script itself reads this value)
+  // rather than strict equality to the JS boolean `true`.
+  const persistEnabledOnRestore = await page.evaluate(
+    () => (window as any).aimlVisitorLanguage && (window as any).aimlVisitorLanguage.persistEnabled
+  );
+  expect(persistEnabledOnRestore).toBeTruthy();
+
   await page.waitForURL(/\/sv\//, { timeout: 10_000 });
   expect(new URL(page.url()).pathname).toBe('/sv/');
 });

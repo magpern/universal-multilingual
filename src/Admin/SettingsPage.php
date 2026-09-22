@@ -53,6 +53,12 @@ final class SettingsPage {
 	private const OPTION_GROUP = 'aiml_settings_group';
 
 	/**
+	 * Name of the raw textarea field for the geo-language map (not a settings
+	 * array key — converted into `geo_language_map` in {@see self::sanitize_settings()}).
+	 */
+	private const GEO_LANGUAGE_MAP_FIELD = 'aiml_geo_language_map_raw';
+
+	/**
 	 * Transient key prefix for Strategy F dependency rejection notices.
 	 */
 	public const FLAG_NOTICE_TRANSIENT = 'aiml_strategy_f_flag_combo_rejected';
@@ -253,6 +259,14 @@ final class SettingsPage {
 			$raw['ai_api_key_encrypted'] = (string) ( $previous['ai_api_key_encrypted'] ?? '' );
 		}
 
+		// Geo-language map arrives as a separate `COUNTRY=code` per-line textarea,
+		// not as a nested array field — parse it into the shape Settings::sanitize() expects.
+		if ( isset( $_POST[ self::GEO_LANGUAGE_MAP_FIELD ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- covered by the Settings API's own settings_fields() nonce.
+			$raw['geo_language_map'] = $this->parse_geo_language_map_textarea(
+				(string) wp_unslash( $_POST[ self::GEO_LANGUAGE_MAP_FIELD ] ) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Missing -- covered by settings_fields() above; parsed/validated line-by-line below and again in Settings::sanitize().
+			);
+		}
+
 		$clean = Settings::sanitize( $raw );
 
 		if ( ! is_array( $input ) ) {
@@ -273,6 +287,35 @@ final class SettingsPage {
 		$clean['localized_urls_woo_product_fingerprint']   = $previous['localized_urls_woo_product_fingerprint'] ?? '';
 
 		return $clean;
+	}
+
+	/**
+	 * Parses the `COUNTRY=code` per-line geo-map textarea into an array.
+	 *
+	 * Loose parsing only — final validation (format, allowlist, size cap)
+	 * happens in {@see Settings::sanitize()}, which is the single source of
+	 * truth for what is actually stored.
+	 *
+	 * @param string $raw Raw textarea contents.
+	 * @return array<string, string>
+	 */
+	private function parse_geo_language_map_textarea( string $raw ): array {
+		$out   = array();
+		$lines = preg_split( '/[\r\n]+/', $raw );
+		$lines = false !== $lines ? $lines : array();
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			if ( '' === $line || false === strpos( $line, '=' ) ) {
+				continue;
+			}
+			list( $country, $lang ) = array_map( 'trim', explode( '=', $line, 2 ) );
+			if ( '' === $country || '' === $lang ) {
+				continue;
+			}
+			$out[ $country ] = $lang;
+		}
+
+		return $out;
 	}
 
 	/**
@@ -382,6 +425,8 @@ final class SettingsPage {
 		echo '</tbody></table>';
 
 		$this->render_floating_selector_settings( $current );
+
+		$this->render_visitor_language_settings( $current );
 
 		$this->render_strategy_f_settings( $current );
 
@@ -681,6 +726,62 @@ final class SettingsPage {
 			__( 'Best-effort: selecting a language may save the existing preferred-language setting while the browser navigates. Navigation never waits on this save.', 'universal-multilingual' ),
 			(bool) ( $current['floating_selector_persist_preference'] ?? true )
 		);
+
+		echo '</tbody></table>';
+	}
+
+	/**
+	 * Anonymous visitor language persistence/detection settings (ADR-0035).
+	 *
+	 * @param array<string, mixed> $current Current settings.
+	 */
+	private function render_visitor_language_settings( array $current ): void {
+		echo '<h2>' . esc_html__( 'Visitor language persistence &amp; detection', 'universal-multilingual' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Anonymous visitors keep using the existing switcher/floating selector for the actual language links. These settings only control whether an explicit click may be remembered, and whether an optional, dismissible suggestion is offered from browser or location signals. Nothing here changes what the server renders for a given URL.', 'universal-multilingual' ) . '</p>';
+
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		$this->checkbox_row_explicit(
+			'visitor_cookie_persist_enabled',
+			__( 'Remember explicit anonymous selection', 'universal-multilingual' ),
+			__( 'When a visitor clicks an existing language link, remember it in a first-party cookie on their own browser so it applies again on a later visit. Default on. Never applies to an already explicitly-prefixed URL, and never persists a browser/location guess automatically.', 'universal-multilingual' ),
+			(bool) ( $current['visitor_cookie_persist_enabled'] ?? true )
+		);
+
+		$this->checkbox_row(
+			'visitor_autodetect_enabled',
+			__( 'Suggest a language automatically', 'universal-multilingual' ),
+			__( 'Master switch. When on, a small dismissible suggestion may appear based on browser language and/or location — never a silent redirect, and never on its own without a visitor accepting it. Default off.', 'universal-multilingual' ),
+			(bool) ( $current['visitor_autodetect_enabled'] ?? false )
+		);
+
+		$this->checkbox_row_explicit(
+			'visitor_autodetect_browser_enabled',
+			__( 'Use browser language', 'universal-multilingual' ),
+			__( 'Suggest a language from the visitor\'s browser settings when it matches an enabled language. Only takes effect while the master switch above is also on.', 'universal-multilingual' ),
+			(bool) ( $current['visitor_autodetect_browser_enabled'] ?? true )
+		);
+
+		$this->checkbox_row(
+			'visitor_autodetect_geo_enabled',
+			__( 'Use location (requires Universal Geo Context)', 'universal-multilingual' ),
+			__( 'Suggest a language from the visitor\'s country, using the country-to-language map below. Only consulted when browser language produced no match, and only takes effect while the master switch above is also on. Has no effect — and no error — when Universal Geo Context is not active.', 'universal-multilingual' ),
+			(bool) ( $current['visitor_autodetect_geo_enabled'] ?? false )
+		);
+
+		if ( ! function_exists( 'universal_geo_get_country_code' ) ) {
+			echo '<tr><td colspan="2"><p class="description">' . esc_html__( 'Universal Geo Context was not detected as active. Location-based suggestions will have no effect until it is installed and active.', 'universal-multilingual' ) . '</p></td></tr>';
+		}
+
+		$map_lines = array();
+		foreach ( (array) ( $current['geo_language_map'] ?? array() ) as $country => $lang ) {
+			$map_lines[] = $country . '=' . $lang;
+		}
+
+		echo '<tr><th scope="row"><label for="aiml_geo_language_map">' . esc_html__( 'Country-to-language map', 'universal-multilingual' ) . '</label></th><td>';
+		echo '<textarea name="' . esc_attr( self::GEO_LANGUAGE_MAP_FIELD ) . '" id="aiml_geo_language_map" rows="6" cols="40" class="large-text code" placeholder="SE=sv&#10;NO=no">' . esc_textarea( implode( "\n", $map_lines ) ) . '</textarea>';
+		echo '<p class="description">' . esc_html__( 'One COUNTRY=language per line, e.g. SE=sv. No countries are mapped by default — ambiguous countries only get an automatic suggestion once you add them here.', 'universal-multilingual' ) . '</p>';
+		echo '</td></tr>';
 
 		echo '</tbody></table>';
 	}

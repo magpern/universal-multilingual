@@ -1,0 +1,67 @@
+/**
+ * Anonymous browser/geo language suggestion banner.
+ *
+ * Separate from the actual language selector (Switcher / FloatingSelector) —
+ * this only ever proposes accepting a switch or dismissing it.
+ */
+
+.aiml-visitor-suggest {
+	--aiml-vs-bg: #111;
+	--aiml-vs-fg: #fff;
+	--aiml-vs-accent: #4a9eff;
+	--aiml-vs-radius: 0.625rem;
+	--aiml-vs-z-index: 999;
+	box-sizing: border-box;
+	position: fixed;
+	z-index: var(--aiml-vs-z-index);
+	inset-inline-end: 1rem;
+	inset-block-end: 1rem;
+	max-width: min(22rem, calc(100vw - 2rem));
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.75rem 0.875rem;
+	background: var(--aiml-vs-bg);
+	color: var(--aiml-vs-fg);
+	border-radius: var(--aiml-vs-radius);
+	font-size: 0.875rem;
+	line-height: 1.3;
+	box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.25);
+}
+
+.aiml-visitor-suggest__text {
+	flex: 1 1 auto;
+}
+
+.aiml-visitor-suggest__accept {
+	flex: 0 0 auto;
+	color: var(--aiml-vs-accent);
+	text-decoration: underline;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.aiml-visitor-suggest__accept:focus-visible,
+.aiml-visitor-suggest__dismiss:focus-visible {
+	outline: 2px solid var(--aiml-vs-accent);
+	outline-offset: 2px;
+}
+
+.aiml-visitor-suggest__dismiss {
+	flex: 0 0 auto;
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: 1.125rem;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0.125rem 0.25rem;
+}
+
+@media (max-width: 480px) {
+	.aiml-visitor-suggest {
+		inset-inline: 0.5rem;
+		max-width: none;
+	}
+}

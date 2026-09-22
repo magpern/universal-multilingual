@@ -119,11 +119,12 @@ final class Switcher {
 
 		foreach ( $this->links() as $link ) {
 			$items .= sprintf(
-				'<li class="menu-item aiml-switcher__menu-item%1$s"><a href="%2$s" hreflang="%3$s" lang="%3$s">%4$s</a></li>',
+				'<li class="menu-item aiml-switcher__menu-item%1$s"><a href="%2$s" hreflang="%3$s" lang="%3$s" data-aiml-code="%5$s">%4$s</a></li>',
 				$link['current'] ? ' current-menu-item' : '',
 				esc_url( $link['url'] ),
 				esc_attr( $link['hreflang'] ),
-				esc_html( $link['label'] )
+				esc_html( $link['label'] ),
+				esc_attr( $link['code'] )
 			);
 		}
 
@@ -146,11 +147,12 @@ final class Switcher {
 
 		foreach ( $links as $link ) {
 			$out .= sprintf(
-				'<li class="aiml-switcher__item%1$s"><a href="%2$s" hreflang="%3$s" lang="%3$s">%4$s</a></li>',
+				'<li class="aiml-switcher__item%1$s"><a href="%2$s" hreflang="%3$s" lang="%3$s" data-aiml-code="%5$s">%4$s</a></li>',
 				$link['current'] ? ' is-current' : '',
 				esc_url( $link['url'] ),
 				esc_attr( $link['hreflang'] ),
-				esc_html( $link['label'] )
+				esc_html( $link['label'] ),
+				esc_attr( $link['code'] )
 			);
 		}
 

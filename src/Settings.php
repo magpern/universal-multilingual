@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace AIMultilingual;
 
 use AIMultilingual\Block\FeatureFlags;
+use AIMultilingual\Language\Languages;
 
 /**
  * Sole owner of the `aiml_settings` option.
@@ -34,7 +35,7 @@ final class Settings {
 	/**
 	 * Shape version of the settings array (not the database schema version).
 	 */
-	public const SCHEMA_VERSION = 3;
+	public const SCHEMA_VERSION = 4;
 
 	/**
 	 * Lazily loaded, sanitized settings.
@@ -91,6 +92,26 @@ final class Settings {
 			'floating_selector_show_desktop'           => true,
 			'floating_selector_show_mobile'            => true,
 			'floating_selector_persist_preference'     => true,
+
+			/*
+			 * ADR-0035: anonymous visitor language persistence/detection.
+			 *
+			 * `visitor_cookie_persist_enabled` defaults ON: a visitor's own
+			 * deliberate click on an existing selector (Switcher/FloatingSelector)
+			 * may persist to the client-side `aiml_visitor_lang` cookie so it
+			 * survives future visits. This never changes anonymous server-side
+			 * rendering (ADR-0024) — persistence and any resulting navigation are
+			 * entirely client-side.
+			 *
+			 * `visitor_autodetect_enabled` (and its browser/geo sub-flags) default
+			 * OFF: automatic browser/geo suggestions are opt-in and never activate
+			 * merely because the plugin was upgraded.
+			 */
+			'visitor_cookie_persist_enabled'           => true,
+			'visitor_autodetect_enabled'               => false,
+			'visitor_autodetect_browser_enabled'       => true,
+			'visitor_autodetect_geo_enabled'           => false,
+			'geo_language_map'                         => array(),
 
 			/*
 			 * Strategy F (F1): block attribute registration.
@@ -206,7 +227,7 @@ final class Settings {
 
 		$clean = $defaults;
 
-		foreach ( array( 'remove_data_on_uninstall', 'switcher_show_native_name', 'switcher_hide_current', 'floating_selector_enabled', 'floating_selector_show_desktop', 'floating_selector_show_mobile', 'floating_selector_persist_preference', 'block_attr_registration_enabled', 'block_uuid_injection_enabled', 'block_extraction_enabled', 'block_frontend_rendering_enabled', 'elementor_extraction_enabled', 'elementor_frontend_rendering_enabled', 'ai_enabled', 'qa_block_on_error', 'segment_publication_gate_enabled' ) as $key ) {
+		foreach ( array( 'remove_data_on_uninstall', 'switcher_show_native_name', 'switcher_hide_current', 'floating_selector_enabled', 'floating_selector_show_desktop', 'floating_selector_show_mobile', 'floating_selector_persist_preference', 'visitor_cookie_persist_enabled', 'visitor_autodetect_enabled', 'visitor_autodetect_browser_enabled', 'visitor_autodetect_geo_enabled', 'block_attr_registration_enabled', 'block_uuid_injection_enabled', 'block_extraction_enabled', 'block_frontend_rendering_enabled', 'elementor_extraction_enabled', 'elementor_frontend_rendering_enabled', 'ai_enabled', 'qa_block_on_error', 'segment_publication_gate_enabled' ) as $key ) {
 			if ( array_key_exists( $key, $raw ) ) {
 				$clean[ $key ] = self::to_bool( $raw[ $key ] );
 			}
@@ -318,6 +339,10 @@ final class Settings {
 			if ( '' === $key || str_starts_with( $key, 'aiml1:' ) ) {
 				$clean['ai_api_key_encrypted'] = substr( $key, 0, 4096 );
 			}
+		}
+
+		if ( array_key_exists( 'geo_language_map', $raw ) ) {
+			$clean['geo_language_map'] = self::sanitize_geo_language_map( $raw['geo_language_map'] );
 		}
 
 		$clean['ai_providers'] = self::sanitize_ai_providers(
@@ -436,6 +461,45 @@ final class Settings {
 				$tokens = 393216;
 			}
 			$out['max_tokens'] = $tokens;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Sanitizes the admin-owned country→language geo fallback map.
+	 *
+	 * No shipped defaults: only an explicit, well-formed admin mapping produces
+	 * any automatic behavior (ADR-0035). Format validation only — whether a
+	 * target code is currently an enabled/routable language is checked at the
+	 * point of use, since that depends on live `aiml_languages` state that this
+	 * pure method deliberately never reads.
+	 *
+	 * @param mixed $raw Raw map value.
+	 * @return array<string, string> Uppercase ISO country code => language code.
+	 */
+	private static function sanitize_geo_language_map( $raw ): array {
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $raw as $country => $language_code ) {
+			if ( count( $out ) >= 300 ) {
+				break;
+			}
+
+			$country = strtoupper( trim( (string) $country ) );
+			if ( 1 !== preg_match( '/^[A-Z]{2}$/', $country ) ) {
+				continue;
+			}
+
+			$language_code = strtolower( trim( (string) $language_code ) );
+			if ( '' === $language_code || ! Languages::is_valid_code( $language_code ) ) {
+				continue;
+			}
+
+			$out[ $country ] = $language_code;
 		}
 
 		return $out;
@@ -775,5 +839,50 @@ final class Settings {
 	 */
 	public function localized_urls_woo_product_fingerprint(): string {
 		return (string) ( $this->get()['localized_urls_woo_product_fingerprint'] ?? '' );
+	}
+
+	/**
+	 * Whether an explicit anonymous visitor language selection may persist to
+	 * the client-side `aiml_visitor_lang` cookie (ADR-0035). Default on: this
+	 * only ever persists a visitor's own deliberate selector click, never an
+	 * automatic browser/geo signal.
+	 */
+	public function visitor_cookie_persist_enabled(): bool {
+		return (bool) ( $this->get()['visitor_cookie_persist_enabled'] ?? true );
+	}
+
+	/**
+	 * Master switch for automatic browser/geo language suggestions (ADR-0035).
+	 * Default off — opt-in, never activates merely from an upgrade.
+	 */
+	public function visitor_autodetect_enabled(): bool {
+		return (bool) ( $this->get()['visitor_autodetect_enabled'] ?? false );
+	}
+
+	/**
+	 * Whether browser-language (`navigator.languages`) suggestions are enabled.
+	 * Only effective when {@see self::visitor_autodetect_enabled()} is also true.
+	 */
+	public function visitor_autodetect_browser_enabled(): bool {
+		return (bool) ( $this->get()['visitor_autodetect_browser_enabled'] ?? true );
+	}
+
+	/**
+	 * Whether Universal Geo Context fallback suggestions are enabled. Only
+	 * effective when {@see self::visitor_autodetect_enabled()} is also true.
+	 */
+	public function visitor_autodetect_geo_enabled(): bool {
+		return (bool) ( $this->get()['visitor_autodetect_geo_enabled'] ?? false );
+	}
+
+	/**
+	 * Admin-owned country→language geo fallback map. No shipped defaults.
+	 *
+	 * @return array<string, string> Uppercase ISO country code => language code.
+	 */
+	public function geo_language_map(): array {
+		$value = $this->get()['geo_language_map'] ?? array();
+
+		return is_array( $value ) ? $value : array();
 	}
 }

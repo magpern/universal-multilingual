@@ -221,7 +221,12 @@ final class PluginGuardTest extends AimlTestCase {
 	public function test_no_cookie_is_set(): void {
 		$this->assert_absent(
 			array( 'setcookie(', 'wp_set_auth_cookie(', '$_COOKIE' ),
-			'The URL is the only language authority in Milestone 1; a Set-Cookie header would hurt cacheability for nothing.'
+			'The URL is the only anonymous language authority (ADR-0024); a Set-Cookie ' .
+			'header on an anonymous render would hurt cacheability for nothing. ' .
+			'ADR-0035 carves out exactly one narrowly-scoped exception, reachable only ' .
+			'from the authenticated wp_login/user_register hooks, never from an ' .
+			'anonymous render path — see VisitorLanguageCookie::class docblock.',
+			array( 'src/User/VisitorLanguageCookie.php' )
 		);
 	}
 

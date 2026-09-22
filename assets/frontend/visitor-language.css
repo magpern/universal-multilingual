@@ -14,8 +14,15 @@
 	box-sizing: border-box;
 	position: fixed;
 	z-index: var(--aiml-vs-z-index);
+	/*
+	 * Top edge by default, not bottom: third-party chat/support widgets and
+	 * the floating language selector itself all conventionally dock to a
+	 * bottom or vertically-centered corner (observed colliding, intercepting
+	 * clicks, with a support-chat widget at both bottom corners during DEV
+	 * acceptance). The top edge is reserved for none of them.
+	 */
 	inset-inline-end: 1rem;
-	inset-block-end: 1rem;
+	inset-block-start: 1rem;
 	max-width: min(22rem, calc(100vw - 2rem));
 	display: flex;
 	align-items: center;

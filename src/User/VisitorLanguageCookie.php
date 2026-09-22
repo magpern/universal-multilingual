@@ -198,6 +198,12 @@ final class VisitorLanguageCookie {
 	 * always restoring the prior current user afterward (even on exception).
 	 * Scoped to this class only — never used from an anonymous render path.
 	 *
+	 * This fires `set_current_user` from inside `wp_insert_user()`/
+	 * `wp_signon()` — a somewhat unusual, reentrant position. A third-party
+	 * handler of that action that itself creates or authenticates a user
+	 * could in principle recurse; no such handler is known to exist in this
+	 * stack, and the callback here is a small, bounded meta read/write.
+	 *
 	 * @param int      $user_id  User id to act as.
 	 * @param callable $callback `fn(): void`.
 	 */

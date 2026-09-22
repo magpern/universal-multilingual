@@ -65,6 +65,22 @@ async function openPublic(page: Page, path = '/') {
   await page.goto(path + (path.includes('?') ? '&' : '?') + PROBE, { waitUntil: 'domcontentloaded' });
 }
 
+/**
+ * The site's cookie-consent banner overlays the page and can intercept
+ * clicks (e.g. on "Add to cart") until dismissed. Clearing cookies (as most
+ * tests in this suite do, to start from a clean anonymous state) also
+ * clears any prior consent choice, so the banner reappears. Best-effort:
+ * does nothing if the banner isn't present.
+ */
+async function dismissCookieConsentIfPresent(page: Page): Promise<void> {
+  const accept = page.locator('.cky-btn-accept').first();
+  try {
+    await accept.click({ timeout: 3_000 });
+  } catch (e) {
+    // Not present, or already dismissed — nothing to do.
+  }
+}
+
 test('explicit prefixed URL beats a conflicting visitor cookie', async ({ page, context }) => {
   patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
   await setVisitorCookie(context, 'sv');
@@ -354,12 +370,21 @@ test('cookie-driven redirect preserves repeated query parameters and a hash loss
   patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
   await setVisitorCookie(context, 'sv');
 
-  await page.goto(`/?filter=a&filter=b&${PROBE}#section`, { waitUntil: 'domcontentloaded' });
+  // Bracketed array notation (filter[0]=a&filter[1]=b), not bare repeated
+  // keys (filter=a&filter=b): WordPress core's own redirect_canonical()
+  // 301s the latter to a single filter=b BEFORE this plugin's client-side
+  // script ever runs (confirmed directly against the live site; unrelated
+  // to this feature). Bracketed notation is both the realistic form
+  // WooCommerce filter widgets actually use and the one that survives to
+  // reach the client script unmodified, so it is what "losslessly" is
+  // actually verifiable against here.
+  await page.goto(`/?filter%5B0%5D=a&filter%5B1%5D=b&${PROBE}#section`, { waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/sv\//, { timeout: 10_000 });
 
   const url = new URL(page.url());
   expect(url.pathname).toBe('/sv/');
-  expect(url.searchParams.getAll('filter')).toEqual(['a', 'b']);
+  expect(url.searchParams.getAll('filter[0]')).toEqual(['a']);
+  expect(url.searchParams.getAll('filter[1]')).toEqual(['b']);
   expect(url.hash).toBe('#section');
 });
 
@@ -373,12 +398,17 @@ test('WooCommerce: cart contents survive an explicit language switch', async ({ 
   });
   await context.clearCookies();
 
-  await page.goto(`/product/bpc-157/?${PROBE}`, { waitUntil: 'domcontentloaded' });
+  // 'networkidle', not 'domcontentloaded': the theme's add-to-cart click
+  // handler is attached by async-loaded JS chunks, so a click issued right
+  // after domcontentloaded can silently do nothing (confirmed directly
+  // against the live site — no add-to-cart request fires at all).
+  await page.goto(`/product/bpc-157/?${PROBE}`, { waitUntil: 'networkidle' });
+  await dismissCookieConsentIfPresent(page);
   await page.locator('.single_add_to_cart_button').click();
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2_000);
 
   await page.goto(`/cart/?${PROBE}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.woocommerce-cart-form, .cart_item').first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.woocommerce-cart-form')).toBeVisible({ timeout: 10_000 });
 
   const nav = page.locator(SELECTOR);
   await expect(nav).toHaveCount(1);
@@ -392,7 +422,7 @@ test('WooCommerce: cart contents survive an explicit language switch', async ({ 
 
   // Still on a /cart/ page (now language-prefixed), with the item intact.
   expect(new URL(page.url()).pathname).toMatch(/\/cart\/?$/);
-  await expect(page.locator('.woocommerce-cart-form, .cart_item').first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.woocommerce-cart-form')).toBeVisible({ timeout: 10_000 });
 });
 
 test('geo fallback fails safe on a malformed/errored response', async ({ page, context }) => {

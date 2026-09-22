@@ -35,7 +35,12 @@ final class SettingsSanitizeTest extends TestCase {
 		$this->assertTrue( $defaults['floating_selector_show_desktop'] );
 		$this->assertTrue( $defaults['floating_selector_show_mobile'] );
 		$this->assertTrue( $defaults['floating_selector_persist_preference'] );
-		$this->assertSame( 3, Settings::SCHEMA_VERSION );
+		$this->assertTrue( $defaults['visitor_cookie_persist_enabled'], 'Explicit anonymous selection persists by default (ADR-0035).' );
+		$this->assertFalse( $defaults['visitor_autodetect_enabled'], 'Automatic browser/geo suggestions are opt-in.' );
+		$this->assertTrue( $defaults['visitor_autodetect_browser_enabled'] );
+		$this->assertFalse( $defaults['visitor_autodetect_geo_enabled'] );
+		$this->assertSame( array(), $defaults['geo_language_map'], 'No shipped country mappings.' );
+		$this->assertSame( 4, Settings::SCHEMA_VERSION );
 		$this->assertSame( 26214400, $defaults['promotion_max_package_bytes'] );
 		$this->assertSame( 200, $defaults['promotion_log_retention'] );
 		$this->assertFalse( $defaults['block_attr_registration_enabled'] );
@@ -222,5 +227,62 @@ final class SettingsSanitizeTest extends TestCase {
 
 		$on = new Settings( array( 'localized_urls_state' => 'on' ) );
 		$this->assertTrue( $on->is_localized_url_generation_enabled() );
+	}
+
+	public function test_visitor_language_booleans_sanitize(): void {
+		$clean = Settings::sanitize(
+			array(
+				'visitor_cookie_persist_enabled'     => '0',
+				'visitor_autodetect_enabled'         => '1',
+				'visitor_autodetect_browser_enabled' => 'off',
+				'visitor_autodetect_geo_enabled'     => 'yes',
+			)
+		);
+
+		$this->assertFalse( $clean['visitor_cookie_persist_enabled'] );
+		$this->assertTrue( $clean['visitor_autodetect_enabled'] );
+		$this->assertFalse( $clean['visitor_autodetect_browser_enabled'] );
+		$this->assertTrue( $clean['visitor_autodetect_geo_enabled'] );
+	}
+
+	public function test_geo_language_map_accepts_well_formed_entries(): void {
+		$clean = Settings::sanitize(
+			array(
+				'geo_language_map' => array(
+					'se' => 'SV',
+					'NO' => 'no',
+				),
+			)
+		);
+
+		$this->assertSame(
+			array(
+				'SE' => 'sv',
+				'NO' => 'no',
+			),
+			$clean['geo_language_map']
+		);
+	}
+
+	public function test_geo_language_map_drops_malformed_entries(): void {
+		$clean = Settings::sanitize(
+			array(
+				'geo_language_map' => array(
+					'SWE' => 'sv',      // Country code must be exactly two letters.
+					'SE'  => '???',      // Not a valid language-code grammar.
+					'CH'  => '',         // Empty target.
+					'FI'  => 'fi',       // Well-formed, kept.
+					123   => 'sv',       // Non-string key, fails the 2-letter check.
+				),
+			)
+		);
+
+		$this->assertSame( array( 'FI' => 'fi' ), $clean['geo_language_map'] );
+	}
+
+	public function test_geo_language_map_non_array_input_yields_empty_map(): void {
+		$clean = Settings::sanitize( array( 'geo_language_map' => 'not-an-array' ) );
+
+		$this->assertSame( array(), $clean['geo_language_map'] );
 	}
 }

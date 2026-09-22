@@ -289,6 +289,7 @@ footer.doc-foot {
     <a href="#initial-configuration" data-toc>3. Initial configuration</a>
     <a href="#regional-preferences" data-toc class="toc-h3">3a. Regional preferences</a>
     <a href="#floating-selector" data-toc class="toc-h3">3b. Floating selector</a>
+    <a href="#visitor-language" data-toc class="toc-h3">3c. Visitor language (anonymous)</a>
     <a href="#translator-workspace" data-toc>4. Translator Workspace</a>
     <a href="#translating-content" data-toc>5. Translating content</a>
     <a href="#jobs" data-toc>6. Jobs</a>
@@ -342,6 +343,7 @@ footer.doc-foot {
     <li><a href="#initial-configuration">Languages &amp; Settings</a></li>
     <li><a href="#regional-preferences">Regional preferences</a></li>
     <li><a href="#floating-selector">Floating language selector</a></li>
+    <li><a href="#visitor-language">Remember an anonymous visitor's language</a></li>
     <li><a href="#translating-content">Translate content</a></li>
     <li><a href="#review-publication">Review &amp; publish</a></li>
     <li><a href="#site-translate">Site Translate (multi-page workflow)</a></li>
@@ -433,6 +435,11 @@ footer.doc-foot {
       <tr><td>Enable floating selector</td><td>Off</td><td>Shows an optional edge language control on the public site</td><td>Safe; uses the same URLs as the switcher; leave Off until you want it</td></tr>
       <tr><td>Floating selector edge / position / preset</td><td>Right / Center / Edge pill</td><td>Where and how the control looks</td><td>Cosmetic; no flags; CSS hides mobile or desktop when those boxes are off</td></tr>
       <tr><td>Remember language for signed-in users</td><td>On</td><td>Best-effort save of preferred language on click</td><td>Does not change the current page language; navigation never waits on the save</td></tr>
+      <tr><td>Remember explicit anonymous selection</td><td>On</td><td>A visitor's own click on a language link may be remembered in a first-party browser cookie</td><td>Only ever remembers a deliberate click — never a browser/location guess; see <a href="#visitor-language">3c</a></td></tr>
+      <tr><td>Suggest a language automatically</td><td>Off</td><td>Master switch for the optional browser/location suggestion banner</td><td>Off by default; turning it on alone shows nothing until a signal source below is also on</td></tr>
+      <tr><td>Use browser language</td><td>On (only while the master above is also On)</td><td>Suggests a language from the visitor's browser settings</td><td>Never a silent switch — always a dismissible suggestion</td></tr>
+      <tr><td>Use location (Universal Geo Context)</td><td>Off</td><td>Suggests a language from the visitor's country, per the map below</td><td>No effect without Universal Geo Context active and at least one mapped country</td></tr>
+      <tr><td>Country-to-language map</td><td>Empty</td><td>One <code>COUNTRY=language</code> per line (e.g. <code>SE=sv</code>)</td><td>No countries are mapped by default — add only the ones you want to auto-suggest</td></tr>
       <tr><td>Delete all data on uninstall</td><td>Off</td><td>Wipes plugin data when uninstalled</td><td><strong>Destructive</strong> — leave Off unless intentional</td></tr>
       <tr><td>Block saves on QA errors</td><td>On</td><td>Blocks save when QA errors present</td><td>Loosen only if you accept lower structural safety</td></tr>
       <tr><td>Enable AI provider</td><td>Off</td><td>Allows machine translation Jobs/actions</td><td>Requires provider + key</td></tr>
@@ -473,9 +480,22 @@ footer.doc-foot {
     <li><strong>Desktop / mobile:</strong> two checkboxes hide the same markup with CSS. There is no separate mobile HTML or device sniffing.</li>
     <li><strong>Without JavaScript:</strong> each language is a normal link. Users can still change language.</li>
     <li><strong>Keyboard:</strong> the collapsed control is a disclosure, not a listbox. Focus and Escape behave as a disclosure.</li>
-    <li><strong>Signed-in persist:</strong> when “Remember language for signed-in users” is On (default), a click best-effort saves preferred language. Navigation never waits on that save. Guests get no language cookie.</li>
+    <li><strong>Signed-in persist:</strong> when “Remember language for signed-in users” is On (default), a click best-effort saves preferred language. Navigation never waits on that save. An anonymous visitor's click may also be remembered — see <a href="#visitor-language">3c. Visitor language (anonymous)</a>.</li>
   </ul>
   <p>The selector uses the same switcher URLs as the rest of the plugin. It does not change routing, cache keys, or anonymous language authority.</p>
+  <a class="back-top" href="#content">Back to top</a>
+</section>
+
+<section id="visitor-language" data-section>
+  <h2>3c. Visitor language (anonymous)</h2>
+  <p><span class="badge supported">Supported</span> Anonymous, not-logged-in visitors can now have a language choice remembered across visits, and can optionally be offered a suggestion based on their browser or (with a separate plugin) their country. This does not add a second selector — visitors still pick a language through the same switcher/menu links and the floating selector above.</p>
+  <ul>
+    <li><strong>Explicit choice, remembered:</strong> when a visitor clicks a language link, that choice may be remembered in a small first-party cookie on their own browser (setting: <em>Remember explicit anonymous selection</em>, On by default). On a later visit to the site's default-language home page, the browser can then take them straight to their remembered language. An explicit language already in the page address always wins — the remembered cookie never overrides a link or bookmark that already points at a specific language.</li>
+    <li><strong>Suggestions are optional and never silent:</strong> with <em>Suggest a language automatically</em> switched On, a small, dismissible banner (“Switch to Svenska?”) may appear based on the visitor's browser language, and — only if the browser language matched nothing — their country, when Universal Geo Context is installed and a country is mapped below. The page itself never silently switches language because of a guess; the visitor always has to accept the suggestion or dismiss it.</li>
+    <li><strong>Country mapping is yours to set:</strong> no countries are pre-mapped. Add lines like <code>SE=sv</code> to the country-to-language map for exactly the countries you want to suggest a language for. Countries with more than one common language (Switzerland, Belgium, …) are simply left unmapped unless you decide otherwise.</li>
+    <li><strong>Signed-in visitors are unaffected here:</strong> once a visitor logs in, their account's <a href="#regional-preferences">Regional preference</a> takes over as before; logging in also updates the remembered anonymous cookie to match the account's preference.</li>
+  </ul>
+  <div class="callout"><strong class="label">Cache-safe by design</strong> None of this changes what the server sends for a given page address — the remembering, the suggestion, and the redirect back to a remembered language all happen in the visitor's own browser, after the page has already loaded. This keeps full-page caching working exactly as before.</div>
   <a class="back-top" href="#content">Back to top</a>
 </section>
 
@@ -875,7 +895,7 @@ footer.doc-foot {
   <h2>20. Current limitations (v1.12.0)</h2>
   <ul>
     <li>Floating language selector is opt-in (default Off); it does not replace theme/menu switchers.</li>
-    <li>Preferred language is a signed-in preference only — it does not change the current URL language or set an anonymous cookie.</li>
+    <li>The signed-in <a href="#regional-preferences">account preferred language</a> never changes the current URL language by itself and never sets a cookie directly — it only redirects a signed-in visitor away from the default-language URL toward their stored preference. Separately, anonymous visitors can have an explicit selector click remembered in a first-party <code>aiml_visitor_lang</code> browser cookie — see <a href="#visitor-language">3c. Visitor language (anonymous)</a>. The two are distinct mechanisms: one is account storage plus a login-time redirect, the other is a client-side-only anonymous cookie.</li>
     <li>Site Translate covers pages/posts/products only (not menus/terms one-click).</li>
     <li>Jobs → Operations linking is source-level only (no translation_id enrichment).</li>
     <li>Richer multi-language UX polish remains backlog.</li>

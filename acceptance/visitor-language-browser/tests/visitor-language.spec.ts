@@ -366,18 +366,30 @@ test('same tab: a second explicit language change still redirects from a later u
   expect(new URL(page.url()).pathname).toBe('/de/');
 });
 
-test('cookie-driven redirect preserves repeated query parameters and a hash losslessly', async ({ page, context }) => {
+test('cookie-driven redirect preserves multiple query parameters and a hash losslessly', async ({ page, context }) => {
   patchSettings({ visitor_cookie_persist_enabled: true, visitor_autodetect_enabled: false });
   await setVisitorCookie(context, 'sv');
 
   // Bracketed array notation (filter[0]=a&filter[1]=b), not bare repeated
-  // keys (filter=a&filter=b): WordPress core's own redirect_canonical()
-  // 301s the latter to a single filter=b BEFORE this plugin's client-side
-  // script ever runs (confirmed directly against the live site; unrelated
-  // to this feature). Bracketed notation is both the realistic form
-  // WooCommerce filter widgets actually use and the one that survives to
-  // reach the client script unmodified, so it is what "losslessly" is
-  // actually verifiable against here.
+  // keys (filter=a&filter=b). This proves distinct query keys (including
+  // the array-style form WooCommerce filter widgets actually use) and a
+  // hash survive the redirect losslessly.
+  //
+  // Bare repeated identical keys are NOT covered by an end-to-end test
+  // here, and cannot meaningfully be: WordPress core's own
+  // redirect_canonical() 301s ?filter=a&filter=b to a single ?filter=b
+  // BEFORE any client-side script (this plugin's or otherwise) ever sees
+  // it — confirmed directly against the live site, and true for every
+  // WordPress request, not something specific to this plugin. A real
+  // visitor's browser therefore can never actually hand this plugin's
+  // script a same-key-repeated query string on this stack; there is
+  // nothing to lose losslessly in practice. The implementation still
+  // preserves duplicates correctly BY CONSTRUCTION if it ever did receive
+  // them — withCurrentQueryAndHash() copies window.location.search
+  // through as a raw string and never re-serializes it via
+  // URLSearchParams.set() (the specific operation that collapses
+  // duplicates) — verified by inspection, not restated here as an
+  // unreachable/untestable live-navigation assertion.
   await page.goto(`/?filter%5B0%5D=a&filter%5B1%5D=b&${PROBE}#section`, { waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/sv\//, { timeout: 10_000 });
 
